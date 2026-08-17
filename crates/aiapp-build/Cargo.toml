@@ -1,0 +1,10 @@
+[package]
+name = "aiapp-build"
+description = "aiapp-mb 构建器：调用 MoonBit 工具链把工程编译为 WASM 字节码"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror.workspace = true
