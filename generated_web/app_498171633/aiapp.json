@@ -1,0 +1,9 @@
+{
+  "appId": "app_47435515",
+  "name": "app",
+  "version": "0.1.0",
+  "description": "做一个本月账单统计小应用",
+  "hostSdkVersion": ">=0.1.0",
+  "template": "minimal",
+  "createdAt": "2026-08-18T04:43:34Z"
+}

@@ -28,7 +28,16 @@ struct MarketApp {
     template: String,
     source: String,
     created_at: String,
+    /// 版本号，如 "1.0.0"。
+    version: String,
+    /// 所有者标识。内置示例为 "官方"；用户生成的应用所有者为 "me"。
+    owner: String,
+    /// 可见性："public" 已发布到市场；"private" 仅所有者可见使用。
+    visibility: String,
 }
+
+/// 当前登录用户（单用户模拟）。
+const OWNER_ME: &str = "me";
 
 /// 应用状态：共享工作目录 + 市场列表。
 #[derive(Clone)]
@@ -46,6 +55,16 @@ struct GenerateRequest {
     /// 是否尝试调用 moon 编译为 .aiapp（默认 false，避免无工具链时报错）。
     #[serde(default)]
     build: bool,
+    /// 生成模式："new" 新建应用（默认）；"update" 更新既有应用。
+    #[serde(default = "default_mode")]
+    mode: String,
+    /// 更新模式下要更新的应用 id（须为当前用户所有）。
+    #[serde(default)]
+    target_id: String,
+}
+
+fn default_mode() -> String {
+    "new".to_string()
 }
 
 /// 生成/构建响应。
@@ -57,6 +76,8 @@ struct GenerateResponse {
     project_dir: String,
     build_result: Option<String>,
     error: Option<String>,
+    /// 新建模式返回新建的应用；更新模式返回更新后的应用。
+    app: Option<MarketApp>,
 }
 
 /// 模板列表响应。
@@ -80,6 +101,33 @@ struct MarketResponse {
     platforms: Vec<String>,
 }
 
+/// 我的应用列表响应。
+#[derive(Serialize)]
+struct MyAppsResponse {
+    apps: Vec<MarketApp>,
+}
+
+/// 发布/更新请求体。
+#[derive(Deserialize)]
+struct PublishRequest {
+    id: String,
+    name: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    platforms: Vec<String>,
+}
+
+/// 操作结果响应。
+#[derive(Serialize)]
+struct ActionResponse {
+    ok: bool,
+    error: Option<String>,
+    app: Option<MarketApp>,
+}
+
 /// 应用详情响应。
 #[derive(Serialize)]
 struct AppDetailResponse {
@@ -92,107 +140,65 @@ struct AppDetailResponse {
 
 /// 预置示例应用。
 fn seed_market_apps() -> Vec<MarketApp> {
-    vec![
+    fn app(
+        id: &str, name: &str, description: &str, tags: &[&str], platforms: &[&str],
+        template: &str, version: &str, owner: &str, visibility: &str,
+    ) -> MarketApp {
         MarketApp {
-            id: "expense-book".into(),
-            name: "日常记账本".into(),
-            description: "随手记下每笔收支，按类别自动汇总，月末生成清晰报表".into(),
-            tags: vec!["实用工具".into(), "数据看板".into()],
-            platforms: vec!["网页".into(), "手机".into(), "macOS".into(), "Windows".into(), "鸿蒙".into()],
-            template: "calculator".into(),
+            id: id.into(),
+            name: name.into(),
+            description: description.into(),
+            tags: tags.iter().map(|s| s.to_string()).collect(),
+            platforms: platforms.iter().map(|s| s.to_string()).collect(),
+            template: template.into(),
             source: String::new(),
             created_at: "2026-08-18 10:00".into(),
-        },
-        MarketApp {
-            id: "todo-team".into(),
-            name: "团队待办协作".into(),
-            description: "和同事共享待办清单，分配任务、设置截止时间、跟踪完成进度".into(),
-            tags: vec!["办公效率".into(), "协作".into()],
-            platforms: vec!["网页".into(), "手机".into(), "电脑".into(), "鸿蒙".into()],
-            template: "todo".into(),
-            source: String::new(),
-            created_at: "2026-08-18 09:30".into(),
-        },
-        MarketApp {
-            id: "money-calculator".into(),
-            name: "全能计算器".into(),
-            description: "四则运算、百分比例、开方平方，界面清爽，适合日常办公和购物比价".into(),
-            tags: vec!["实用工具".into()],
-            platforms: vec!["网页".into(), "手机".into(), "macOS".into(), "Windows".into(), "车机".into(), "电视盒".into()],
-            template: "calculator".into(),
-            source: String::new(),
-            created_at: "2026-08-18 08:15".into(),
-        },
-        MarketApp {
-            id: "photo-filter".into(),
-            name: "照片滤镜工坊".into(),
-            description: "一键给照片添加灰度、暖色调、冷色调等滤镜，还能调节亮度和对比度".into(),
-            tags: vec!["创意工具".into(), "实用工具".into()],
-            platforms: vec!["网页".into(), "手机".into(), "macOS".into(), "Windows".into(), "鸿蒙".into()],
-            template: "image-filter".into(),
-            source: String::new(),
-            created_at: "2026-08-17 16:20".into(),
-        },
-        MarketApp {
-            id: "meeting-notes".into(),
-            name: "会议纪要整理".into(),
-            description: "记录会议关键要点，自动拆出待办事项和责任人，会后一键同步给团队".into(),
-            tags: vec!["办公效率".into(), "协作".into()],
-            platforms: vec!["网页".into(), "电脑".into(), "macOS".into(), "Windows".into(), "鸿蒙".into()],
-            template: "todo".into(),
-            source: String::new(),
-            created_at: "2026-08-17 10:00".into(),
-        },
-        MarketApp {
-            id: "daily-weather".into(),
-            name: "今日出行天气".into(),
-            description: "实时天气与七日内预报，包含温度曲线、风力、紫外线，出门前看一眼".into(),
-            tags: vec!["出行导航".into(), "实用工具".into()],
-            platforms: vec!["车机".into(), "手机".into(), "电视盒".into()],
-            template: "minimal".into(),
-            source: String::new(),
-            created_at: "2026-08-16 09:00".into(),
-        },
-        MarketApp {
-            id: "car-showroom".into(),
-            name: "车商展厅".into(),
-            description: "车辆参数、报价一览，支持车型对比，适合在门店或车上给客户演示".into(),
-            tags: vec!["行业应用".into(), "数据看板".into()],
-            platforms: vec!["车机".into(), "电视盒".into()],
-            template: "minimal".into(),
-            source: String::new(),
-            created_at: "2026-08-16 08:30".into(),
-        },
-        MarketApp {
-            id: "family-movie".into(),
-            name: "家庭影音点播".into(),
-            description: "全家共享的影片片单，按类型分类浏览，遥控器即可操作，字体大不费眼".into(),
-            tags: vec!["影音娱乐".into(), "无障碍".into()],
-            platforms: vec!["电视盒".into(), "车机".into()],
-            template: "image-filter".into(),
-            source: String::new(),
-            created_at: "2026-08-15 20:00".into(),
-        },
-        MarketApp {
-            id: "grandma-menu".into(),
-            name: "老人简易菜单".into(),
-            description: "超大字体、极简按钮，常用功能一键直达，方便老人轻松使用电视盒".into(),
-            tags: vec!["无障碍".into(), "影音娱乐".into()],
-            platforms: vec!["电视盒".into(), "车机".into(), "鸿蒙".into()],
-            template: "minimal".into(),
-            source: String::new(),
-            created_at: "2026-08-15 09:40".into(),
-        },
-        MarketApp {
-            id: "route-navi".into(),
-            name: "沿途兴趣点导航".into(),
-            description: "根据当前行程推荐沿路的加油站、充电站、餐厅和景点".into(),
-            tags: vec!["出行导航".into(), "行业应用".into()],
-            platforms: vec!["车机".into(), "手机".into()],
-            template: "minimal".into(),
-            source: String::new(),
-            created_at: "2026-08-14 14:20".into(),
-        },
+            version: version.into(),
+            owner: owner.into(),
+            visibility: visibility.into(),
+        }
+    }
+    vec![
+        app("expense-book", "日常记账本",
+            "随手记下每笔收支，按类别自动汇总，月末生成清晰报表",
+            &["实用工具", "数据看板"], &["网页", "手机", "macOS", "Windows", "鸿蒙"],
+            "calculator", "1.0.0", "官方", "public"),
+        app("todo-team", "团队待办协作",
+            "和同事共享待办清单，分配任务、设置截止时间、跟踪完成进度",
+            &["办公效率", "协作"], &["网页", "手机", "电脑", "鸿蒙"],
+            "todo", "1.0.0", "官方", "public"),
+        app("money-calculator", "全能计算器",
+            "四则运算、百分比例、开方平方，界面清爽，适合日常办公和购物比价",
+            &["实用工具"], &["网页", "手机", "macOS", "Windows", "车机", "电视盒"],
+            "calculator", "1.0.0", "官方", "public"),
+        app("photo-filter", "照片滤镜工坊",
+            "一键给照片添加灰度、暖色调、冷色调等滤镜，还能调节亮度和对比度",
+            &["创意工具", "实用工具"], &["网页", "手机", "macOS", "Windows", "鸿蒙"],
+            "image-filter", "1.0.0", "官方", "public"),
+        app("meeting-notes", "会议纪要整理",
+            "记录会议关键要点，自动拆出待办事项和责任人，会后一键同步给团队",
+            &["办公效率", "协作"], &["网页", "电脑", "macOS", "Windows", "鸿蒙"],
+            "todo", "1.0.0", "官方", "public"),
+        app("daily-weather", "今日出行天气",
+            "实时天气与七日内预报，包含温度曲线、风力、紫外线，出门前看一眼",
+            &["出行导航", "实用工具"], &["车机", "手机", "电视盒"],
+            "minimal", "1.0.0", "官方", "public"),
+        app("car-showroom", "车商展厅",
+            "车辆参数、报价一览，支持车型对比，适合在门店或车上给客户演示",
+            &["行业应用", "数据看板"], &["车机", "电视盒"],
+            "minimal", "1.0.0", "官方", "public"),
+        app("family-movie", "家庭影音点播",
+            "全家共享的影片片单，按类型分类浏览，遥控器即可操作，字体大不费眼",
+            &["影音娱乐", "无障碍"], &["电视盒", "车机"],
+            "image-filter", "1.0.0", "官方", "public"),
+        app("grandma-menu", "老人简易菜单",
+            "超大字体、极简按钮，常用功能一键直达，方便老人轻松使用电视盒",
+            &["无障碍", "影音娱乐"], &["电视盒", "车机", "鸿蒙"],
+            "minimal", "1.0.0", "官方", "public"),
+        app("route-navi", "沿途兴趣点导航",
+            "根据当前行程推荐沿路的加油站、充电站、餐厅和景点",
+            &["出行导航", "行业应用"], &["车机", "手机"],
+            "minimal", "1.0.0", "官方", "public"),
     ]
 }
 
@@ -214,7 +220,10 @@ pub fn router() -> Router {
         .route("/api/templates", get(list_templates))
         .route("/api/generate", post(generate))
         .route("/api/market", get(list_market))
-        .route("/api/market/:id", get(app_detail))
+        .route("/api/my-apps", get(list_my_apps))
+        .route("/api/publish", post(publish_app))
+        .route("/api/delete", post(delete_app))
+        .route("/api/app/:id", get(app_detail))
         .nest_service("/static/templates", serve_static)
         .with_state(state)
 }
@@ -237,9 +246,14 @@ async fn list_templates() -> Json<TemplatesResponse> {
     Json(TemplatesResponse { templates })
 }
 
-/// 获取应用市场列表。
+/// 获取应用市场列表（仅公开应用）。
 async fn list_market(State(state): State<Arc<AppState>>) -> Json<MarketResponse> {
-    let apps = state.market.lock().await.clone();
+    let all = state.market.lock().await.clone();
+    let apps: Vec<MarketApp> = all
+        .iter()
+        .filter(|a| a.visibility == "public")
+        .cloned()
+        .collect();
     // 收集所有去重标签
     let mut tags: Vec<String> = apps
         .iter()
@@ -255,6 +269,72 @@ async fn list_market(State(state): State<Arc<AppState>>) -> Json<MarketResponse>
     platforms.sort();
     platforms.dedup();
     Json(MarketResponse { apps, tags, platforms })
+}
+
+/// 我的应用列表（当前用户拥有，含私有与已发布）。
+async fn list_my_apps(State(state): State<Arc<AppState>>) -> Json<MyAppsResponse> {
+    let all = state.market.lock().await.clone();
+    let apps = all
+        .into_iter()
+        .filter(|a| a.owner == OWNER_ME)
+        .collect();
+    Json(MyAppsResponse { apps })
+}
+
+/// 发布应用：补充基础信息后公开到市场。
+async fn publish_app(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<PublishRequest>,
+) -> Json<ActionResponse> {
+    let mut market = state.market.lock().await;
+    let idx = match market.iter().position(|a| a.id == req.id && a.owner == OWNER_ME) {
+        Some(i) => i,
+        None => {
+            return Json(ActionResponse {
+                ok: false,
+                error: Some("应用不存在或无权操作".into()),
+                app: None,
+            })
+        }
+    };
+    let name = req.name.trim().to_string();
+    if name.is_empty() {
+        return Json(ActionResponse {
+            ok: false,
+            error: Some("请填写应用名称".into()),
+            app: None,
+        });
+    }
+    let app = &mut market[idx];
+    app.name = name;
+    app.description = req.description.trim().to_string();
+    app.tags = req.tags.iter().filter(|s| !s.is_empty()).cloned().collect();
+    app.platforms = req.platforms.iter().filter(|s| !s.is_empty()).cloned().collect();
+    if app.platforms.is_empty() {
+        app.platforms = vec!["网页".into(), "手机".into(), "电脑".into()];
+    }
+    app.visibility = "public".into();
+    let cloned = app.clone();
+    Json(ActionResponse { ok: true, error: None, app: Some(cloned) })
+}
+
+/// 删除应用（仅限自己的应用）。
+async fn delete_app(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<PublishRequest>,
+) -> Json<ActionResponse> {
+    let mut market = state.market.lock().await;
+    match market.iter().position(|a| a.id == req.id && a.owner == OWNER_ME) {
+        Some(i) => {
+            let removed = market.remove(i);
+            Json(ActionResponse { ok: true, error: None, app: Some(removed) })
+        }
+        None => Json(ActionResponse {
+            ok: false,
+            error: Some("应用不存在或无权操作".into()),
+            app: None,
+        }),
+    }
 }
 
 /// 获取应用详情（打开应用时调用）。
@@ -343,7 +423,7 @@ fn mock_app_content(template: &str, name: &str) -> String {
     }
 }
 
-/// 生成应用工程。
+/// 生成应用工程（新建或更新）。
 async fn generate(
     State(state): State<Arc<AppState>>,
     Json(req): Json<GenerateRequest>,
@@ -357,6 +437,7 @@ async fn generate(
             project_dir: String::new(),
             build_result: None,
             error: Some("请先描述你要做的应用".into()),
+            app: None,
         });
     }
 
@@ -365,6 +446,42 @@ async fn generate(
         "minimal"
     } else {
         &req.template
+    };
+
+    // 更新模式：先校验应用归属
+    let update_target: Option<MarketApp> = if req.mode == "update" {
+        if req.target_id.is_empty() {
+            return Json(GenerateResponse {
+                ok: false,
+                source: String::new(),
+                manifest: serde_json::Value::Null,
+                project_dir: String::new(),
+                build_result: None,
+                error: Some("更新应用需要指定要更新的应用".into()),
+                app: None,
+            });
+        }
+        let market = state.market.lock().await;
+        let found = market
+            .iter()
+            .find(|a| a.id == req.target_id && a.owner == OWNER_ME)
+            .cloned();
+        match found {
+            Some(a) => Some(a),
+            None => {
+                return Json(GenerateResponse {
+                    ok: false,
+                    source: String::new(),
+                    manifest: serde_json::Value::Null,
+                    project_dir: String::new(),
+                    build_result: None,
+                    error: Some("找不到要更新的应用，或你不是它的所有者".into()),
+                    app: None,
+                })
+            }
+        }
+    } else {
+        None
     };
 
     // 用一个唯一子目录存放本次生成的工程
@@ -406,28 +523,48 @@ async fn generate(
                 }
             }
 
-            // 存入应用市场
-            {
+            let now = chrono_now();
+            let app_result = {
                 let mut market = state.market.lock().await;
-                let now = chrono_now();
-                let app_id = format!("gen_{}", market.len() + 1);
-                // 从清单中提取信息
-                let name = manifest.get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or(&description)
-                    .to_string();
-                let app_entry = MarketApp {
-                    id: app_id,
-                    name,
-                    description: description.clone(),
-                    tags: vec!["办公效率".into()], // 默认标签，后续可让用户选择
-                    platforms: vec!["网页".into(), "手机".into(), "电脑".into()],
-                    template: template.to_string(),
-                    source: source.clone(),
-                    created_at: now,
-                };
-                market.push(app_entry);
-            }
+                if let Some(target) = &update_target {
+                    // 更新模式：版本 +1，所有者与可见性保持，更新源码与描述
+                    let idx = market
+                        .iter()
+                        .position(|a| a.id == target.id)
+                        .expect("目标应用应存在");
+                    let app = &mut market[idx];
+                    app.source = source.clone();
+                    app.description = description.clone();
+                    app.template = template.to_string();
+                    app.version = bump_version(&app.version);
+                    app.created_at = now;
+                    app.clone()
+                } else {
+                    // 新建模式：默认为当前用户私有，可自行使用
+                    let name = manifest.get("name")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.trim().is_empty())
+                        .map(|s| s.trim().to_string())
+                        .unwrap_or_else(|| truncate(&description, 16));
+                    let app_id = format!("gen_{}", market.len() + 1);
+                    let app_entry = MarketApp {
+                        id: app_id.clone(),
+                        name,
+                        description: description.clone(),
+                        tags: vec![],          // 发布时填写
+                        platforms: vec!["网页".into(), "手机".into(), "电脑".into()],
+                        template: template.to_string(),
+                        source: source.clone(),
+                        created_at: now,
+                        version: "1.0.0".into(),
+                        owner: OWNER_ME.into(),
+                        visibility: "private".into(),
+                    };
+                    let cloned = app_entry.clone();
+                    market.push(app_entry);
+                    cloned
+                }
+            };
 
             Json(GenerateResponse {
                 ok: true,
@@ -436,6 +573,7 @@ async fn generate(
                 project_dir: dir_name,
                 build_result,
                 error: None,
+                app: Some(app_result),
             })
         }
         Err(e) => Json(GenerateResponse {
@@ -445,8 +583,27 @@ async fn generate(
             project_dir: String::new(),
             build_result: None,
             error: Some(e),
+            app: None,
         }),
     }
+}
+
+/// 简单截断长字符串。
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        s.chars().take(max).collect::<String>() + "..."
+    }
+}
+
+/// 版本号递增：1.2.3 -> 1.2.4。
+fn bump_version(v: &str) -> String {
+    let parts: Vec<&str> = v.trim().split('.').collect();
+    let major = parts.first().unwrap_or(&"1").parse::<u32>().unwrap_or(1);
+    let minor = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let patch = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
+    format!("{major}.{minor}.{}", patch + 1)
 }
 
 /// 获取当前时间字符串。

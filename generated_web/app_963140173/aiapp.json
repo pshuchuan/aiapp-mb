@@ -1,0 +1,9 @@
+{
+  "appId": "app_47435516",
+  "name": "app",
+  "version": "0.1.0",
+  "description": "优化账单统计，加入图表",
+  "hostSdkVersion": ">=0.1.0",
+  "template": "minimal",
+  "createdAt": "2026-08-18T04:43:39Z"
+}
