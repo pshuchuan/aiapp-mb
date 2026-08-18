@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tower_http::services::ServeDir;
 
 use aiapp_gen::{generate_source, write_project, GenConfig, TEMPLATES};
 
@@ -58,6 +59,7 @@ struct TemplatesResponse {
 struct TemplateInfo {
     name: &'static str,
     description: &'static str,
+    image: String,
 }
 
 /// 构建路由。
@@ -68,10 +70,15 @@ pub fn router() -> Router {
     std::fs::create_dir_all(&workdir).expect("创建工作目录失败");
     let state = Arc::new(AppState { workdir });
 
+    // 模板图片目录（编译时获取绝对路径）
+    let static_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src/templates");
+    let serve_static = ServeDir::new(static_dir);
+
     Router::new()
         .route("/", get(serve_index))
         .route("/api/templates", get(list_templates))
         .route("/api/generate", post(generate))
+        .nest_service("/static/templates", serve_static)
         .with_state(state)
 }
 
@@ -87,6 +94,7 @@ async fn list_templates() -> Json<TemplatesResponse> {
         .map(|(name, description)| TemplateInfo {
             name,
             description,
+            image: &format!("/static/templates/{}.png", name),
         })
         .collect();
     Json(TemplatesResponse { templates })
