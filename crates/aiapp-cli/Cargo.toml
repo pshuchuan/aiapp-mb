@@ -1,0 +1,17 @@
+[package]
+name = "aiapp-cli"
+description = "aiapp-mb 命令行入口：描述 → MoonBit 源码 → WASM 字节码"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "aiapp"
+path = "src/main.rs"
+
+[dependencies]
+aiapp-build = { path = "../aiapp-build" }
+aiapp-gen = { path = "../aiapp-gen" }
+anyhow.workspace = true
+clap.workspace = true

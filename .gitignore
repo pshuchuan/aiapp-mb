@@ -1,0 +1,15 @@
+# Rust
+/target
+**/*.rs.bk
+
+# MoonBit 构建产物
+_build/
+target/
+.mooncakes/
+.moonagent/
+
+# 生成的示例应用
+/generated/
+
+# 系统
+.DS_Store
