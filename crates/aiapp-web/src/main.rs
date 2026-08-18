@@ -4,7 +4,7 @@
 //! 生成 MoonBit 应用工程，返回源码与清单；可选调用 moon 编译为 `.aiapp` 包。
 
 use axum::{
-    extract::State,
+    extract::{Path, State},
     routing::{get, post},
     Json, Router,
 };
@@ -78,6 +78,16 @@ struct MarketResponse {
     apps: Vec<MarketApp>,
     tags: Vec<String>,
     platforms: Vec<String>,
+}
+
+/// 应用详情响应。
+#[derive(Serialize)]
+struct AppDetailResponse {
+    ok: bool,
+    app: Option<MarketApp>,
+    /// 模拟应用内容（基于模板）。
+    mock_content: Option<String>,
+    error: Option<String>,
 }
 
 /// 预置示例应用。
@@ -184,6 +194,7 @@ pub fn router() -> Router {
         .route("/api/templates", get(list_templates))
         .route("/api/generate", post(generate))
         .route("/api/market", get(list_market))
+        .route("/api/market/:id", get(app_detail))
         .nest_service("/static/templates", serve_static)
         .with_state(state)
 }
@@ -224,6 +235,92 @@ async fn list_market(State(state): State<Arc<AppState>>) -> Json<MarketResponse>
     platforms.sort();
     platforms.dedup();
     Json(MarketResponse { apps, tags, platforms })
+}
+
+/// 获取应用详情（打开应用时调用）。
+async fn app_detail(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Json<AppDetailResponse> {
+    let market = state.market.lock().await;
+    let app = market.iter().find(|a| a.id == id).cloned();
+    match app {
+        Some(app) => {
+            let mock_content = Some(mock_app_content(&app.template, &app.name));
+            Json(AppDetailResponse { ok: true, app: Some(app), mock_content, error: None })
+        }
+        None => Json(AppDetailResponse {
+            ok: false,
+            app: None,
+            mock_content: None,
+            error: Some("应用不存在".into()),
+        }),
+    }
+}
+
+/// 根据模板生成模拟的应用内容展示。
+fn mock_app_content(template: &str, name: &str) -> String {
+    match template {
+        "calculator" => format!(
+            "应用「{}」已启动 [计算器模式]\n\n\
+             ╔═══════════════╗\n\
+             ║     0         ║\n\
+             ╠═══════════════╣\n\
+             ║ 7 │ 8 │ 9 │ + ║\n\
+             ║───┼───┼───┼───╢\n\
+             ║ 4 │ 5 │ 6 │ - ║\n\
+             ║───┼───┼───┼───╢\n\
+             ║ 1 │ 2 │ 3 │ × ║\n\
+             ║───┼───┼───┼───╢\n\
+             ║ 0 │ . │ = │ ÷ ║\n\
+             ╚═══════════════╝\n\n\
+             支持键盘输入，按 Esc 退出应用",
+            name
+        ),
+        "todo" => format!(
+            "应用「{}」已启动 [待办事项]\n\n\
+             ┌─────────────────────────────┐\n\
+             │ 📋 我的待办              +  │\n\
+             ├─────────────────────────────┤\n\
+             │ ☑ 完成周报              ✓  │\n\
+             │ ☐ 准备会议材料          ○  │\n\
+             │ ☐ 回复客户邮件          ○  │\n\
+             │ ☐ 更新项目进度          ○  │\n\
+             │ ☐ 团队代码审查          ○  │\n\
+             └─────────────────────────────┘\n\n\
+             点击 ○ 勾选完成，按 + 添加新事项",
+            name
+        ),
+        "image-filter" => format!(
+            "应用「{}」已启动 [图片滤镜]\n\n\
+             ┌─────────────────────────────┐\n\
+             │ 🖼 图片滤镜              ⚙  │\n\
+             ├─────────────────────────────┤\n\
+             │                             │\n\
+             │    [ 点击选择图片 ]         │\n\
+             │                             │\n\
+             ├─────────────────────────────┤\n\
+             │ 原图 │ 灰度 │ 暖色 │ 冷色 │\n\
+             └─────────────────────────────┘\n\n\
+             选择滤镜效果，实时预览处理结果",
+            name
+        ),
+        _ => format!(
+            "应用「{}」已启动 [Hello World]\n\n\
+             ┌─────────────────────────────┐\n\
+             │ 欢迎使用 {}       │\n\
+             ├─────────────────────────────┤\n\
+             │                             │\n\
+             │    ✨ 应用运行中 ✨          │\n\
+             │                             │\n\
+             │    当前版本: 1.0.0          │\n\
+             │    状态: 正常运行           │\n\
+             │                             │\n\
+             └─────────────────────────────┘\n\n\
+             该应用已就绪，可在设定的平台上运行",
+            name, name
+        ),
+    }
 }
 
 /// 生成应用工程。
