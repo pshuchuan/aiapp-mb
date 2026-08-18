@@ -257,15 +257,12 @@
     transition: background .15s;
   }
   .app-window .custom-gen:hover { background: var(--accent-2); }
-  .app-window .src-link {
+  .app-window .report-btn {
     font-size: 12px; color: var(--muted); cursor: pointer;
-    text-decoration: underline; text-underline-offset: 3px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 12px; transition: all .15s;
   }
-  .app-window .src-link:hover { color: var(--text); }
-  .app-window .window-source pre {
-    margin-top: 12px; font-size: 12px; max-height: 150px; overflow: auto;
-    color: var(--muted); line-height: 1.5;
-  }
+  .app-window .report-btn:hover { border-color: var(--err); color: var(--err); }
 
   /* ===== 任务栏 ===== */
   .taskbar {
@@ -394,9 +391,8 @@
     <div class="window-source">
       <div class="custom-row">
         <div class="custom-btns" id="winActionBtns"></div>
-        <span class="src-link" id="srcLink" onclick="toggleSource()">查看源码</span>
+        <button class="report-btn" onclick="reportApp()">举报</button>
       </div>
-      <pre id="winSource" style="display:none"></pre>
     </div>
   </div>
 </div>
@@ -834,7 +830,6 @@ function showWindow(app, content) {
   $('winVersion').textContent = 'v' + app.version;
   $('winPlatforms').innerHTML = (app.platforms || []).map(p => `<span class="plat-badge">${p}</span>`).join('');
   $('winBody').innerHTML = `<div class="mock-content">${esc(content)}</div>`;
-  $('winSource').textContent = app.source || '// 暂无源码';
   const isMine = app.owner === 'me';
   $('winOwner').innerHTML =
     `<span>所有者：${app.owner === 'me' ? '我' : esc(app.owner)}</span>` +
@@ -845,10 +840,10 @@ function showWindow(app, content) {
   if (isMine) {
     $('winActionBtns').innerHTML =
       `<button class="custom-gen" onclick="updateThisApp()">🔄 更新此应用</button>
-       <button class="custom-gen" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border)" onclick="customGenerate()">✦ 参考新建</button>`;
+       <button class="custom-gen" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border)" onclick="customGenerate()">基于此应用为生成新应用</button>`;
   } else {
     $('winActionBtns').innerHTML =
-      `<button class="custom-gen" onclick="customGenerate()">✦ 以此为参考新建</button>`;
+      `<button class="custom-gen" onclick="customGenerate()">基于此应用为生成新应用</button>`;
   }
   $('appWindow').classList.add('show');
   document.body.style.overflow = 'hidden';
@@ -904,11 +899,10 @@ function customGenerate() {
   $('descInput').focus();
 }
 
-function toggleSource() {
-  const pre = $('winSource'), link = $('srcLink');
-  const showing = pre.style.display !== 'none';
-  pre.style.display = showing ? 'none' : 'block';
-  link.textContent = showing ? '查看源码' : '收起源码';
+function reportApp() {
+  const app = _appData && _appData.app;
+  if (!app) return;
+  alert(`已收到你对「${app.name}」的举报，平台管理员会尽快核查处理。`);
 }
 
 function closeAllWindows() {
