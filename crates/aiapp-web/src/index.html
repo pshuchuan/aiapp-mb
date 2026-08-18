@@ -198,15 +198,26 @@
     background: #0a0c10; border-radius: 10px; padding: 20px;
   }
   .app-window .window-source {
-    border-top: 1px solid var(--border); padding: 16px 18px;
+    border-top: 1px solid var(--border); padding: 14px 18px;
     background: var(--panel-2);
   }
-  .app-window .window-source summary {
-    cursor: pointer; font-size: 13px; color: var(--muted);
-    font-weight: 600;
+  .app-window .window-source .custom-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
   }
+  .app-window .window-source .custom-gen {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background .15s;
+  }
+  .app-window .window-source .custom-gen:hover { background: var(--accent-2); }
+  .app-window .window-source .src-link {
+    font-size: 12px; color: var(--muted); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .app-window .window-source .src-link:hover { color: var(--text); }
   .app-window .window-source pre {
-    margin-top: 10px; font-size: 12px; max-height: 150px; overflow: auto;
+    margin-top: 12px; font-size: 12px; max-height: 150px; overflow: auto;
     color: var(--muted); line-height: 1.5;
   }
 
@@ -281,10 +292,11 @@
     </div>
     <div class="window-body" id="winBody"></div>
     <div class="window-source">
-      <details>
-        <summary>查看应用源码</summary>
-        <pre id="winSource"></pre>
-      </details>
+      <div class="custom-row">
+        <button class="custom-gen" onclick="customGenerate()">⚙ 以此为模板自定义生成</button>
+        <span class="src-link" id="srcLink" onclick="toggleSource()">查看源码</span>
+      </div>
+      <pre id="winSource" style="display:none"></pre>
     </div>
   </div>
 </div>
@@ -548,6 +560,29 @@ function closeApp() {
 function closeWindow() {
   $('appWindow').classList.remove('show');
   document.body.style.overflow = '';
+}
+
+// 以此为模板自定义生成：关闭当前窗口，打开生成器并预填参考描述
+function customGenerate() {
+  const app = _appData && _appData.app;
+  // 关闭当前应用窗口（不进入后台）
+  closeApp();
+  // 打开生成器抽屉
+  if (!$('genDrawer').classList.contains('show')) toggleGenerator();
+  // 预填描述
+  $('descInput').value = app
+    ? `参考「${app.name}」做一个类似的应用：`
+    : '';
+  $('descInput').focus();
+}
+
+// 切换源码显示
+function toggleSource() {
+  const pre = $('winSource');
+  const link = $('srcLink');
+  const showing = pre.style.display !== 'none';
+  pre.style.display = showing ? 'none' : 'block';
+  link.textContent = showing ? '查看源码' : '收起源码';
 }
 
 function closeAllWindows() {
