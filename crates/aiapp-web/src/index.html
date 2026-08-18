@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小应用生成器 · aiapp-mb</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d24;
+    --panel-2: #22262f;
+    --border: #2c313c;
+    --text: #e8eaed;
+    --muted: #9aa0aa;
+    --accent: #4f8cff;
+    --accent-2: #6ea8ff;
+    --ok: #34c759;
+    --err: #ff5c5c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+  header { text-align: center; margin-bottom: 28px; }
+  header .logo { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+  header .logo b { color: var(--accent-2); }
+  header .sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .tagline {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .chip {
+    font-size: 12px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .chip.active { color: var(--accent-2); border-color: var(--accent); }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  textarea, select, input[type=text] {
+    width: 100%; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; font-size: 15px; font-family: inherit;
+    outline: none;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  textarea:focus, select:focus, input:focus { border-color: var(--accent); }
+  .row { display: flex; gap: 12px; align-items: flex-end; margin-top: 14px; }
+  .row .grow { flex: 1; }
+  select { cursor: pointer; }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    padding: 12px 22px; font-size: 15px; font-weight: 600; cursor: pointer;
+    transition: background .15s;
+  }
+  button:hover { background: var(--accent-2); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+  .result { display: none; margin-top: 18px; }
+  .result.show { display: block; }
+  .result-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .status { font-size: 13px; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  .tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+  .tab {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0; padding: 8px 16px; font-size: 13px; cursor: pointer;
+    font-weight: 500;
+  }
+  .tab.on { background: var(--panel-2); color: var(--text); border-bottom-color: var(--panel-2); }
+  pre {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; font-size: 13px; overflow: auto; max-height: 420px;
+    font-family: "SF Mono", Consolas, "Courier New", monospace; line-height: 1.5;
+  }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 10px; }
+  .meta-item { background: var(--panel-2); border-radius: 10px; padding: 12px; }
+  .meta-item .k { font-size: 12px; color: var(--muted); }
+  .meta-item .v { font-size: 14px; margin-top: 4px; word-break: break-all; }
+  .mono { font-family: "SF Mono", Consolas, monospace; }
+  .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><b>aiapp</b> · 小应用生成器</div>
+    <div class="sub">一句话描述 → 自动生成 MoonBit 应用，一次生成，多处运行</div>
+    <div class="tagline">
+      <span class="chip active">Web</span>
+      <span class="chip">车机</span>
+      <span class="chip">电视盒</span>
+      <span class="chip">移动端</span>
+    </div>
+  </header>
+
+  <div class="card">
+    <label for="desc">描述你想要的这个小应用</label>
+    <textarea id="desc" placeholder="例如：做一个统计本月到账金额的小应用，按日期汇总并展示列表"></textarea>
+    <div class="row">
+      <div class="grow">
+        <label for="tpl">应用模板</label>
+        <select id="tpl"></select>
+      </div>
+      <button id="genBtn">生成应用</button>
+    </div>
+    <div class="hint" id="hint">模板可省略（默认 minimal）。当前使用本地 mock 后端，开箱即用；接入 AI 后可生成贴合业务的应用。</div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="result-head">
+      <div class="status" id="status"></div>
+      <div class="tabs">
+        <button class="tab on" data-tab="manifest">应用信息</button>
+        <button class="tab" data-tab="source">MoonBit 源码</button>
+      </div>
+    </div>
+    <div id="pane-manifest" class="pane">
+      <div class="meta" id="manifestMeta"></div>
+    </div>
+    <div id="pane-source" class="pane" style="display:none">
+      <pre id="sourceCode"></pre>
+    </div>
+    <div class="hint" id="buildMsg"></div>
+  </div>
+
+  <div class="footer">aiapp-mb 员工自助原型 · 面向企业内网部署 · 目标生态位：车机 · 电视盒 · 多端容器</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let templates = [];
+
+// 加载模板列表
+async function loadTemplates() {
+  try {
+    const res = await fetch('/api/templates');
+    const data = await res.json();
+    templates = data.templates || [];
+    const sel = $('tpl');
+    sel.innerHTML = '';
+    templates.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name; opt.textContent = t.description;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    $('hint').textContent = '模板加载失败：' + e.message;
+  }
+}
+
+// Tab 切换
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+    tab.classList.add('on');
+    const name = tab.dataset.tab;
+    $('pane-manifest').style.display = name === 'manifest' ? 'block' : 'none';
+    $('pane-source').style.display = name === 'source' ? 'block' : 'none';
+  });
+});
+
+// 生成
+async function generate() {
+  const desc = $('desc').value.trim();
+  if (!desc) { $('desc').focus(); return; }
+  const template = $('tpl').value;
+  const btn = $('genBtn');
+  btn.disabled = true; btn.textContent = '生成中…';
+  $('result').classList.remove('show');
+  $('status').className = 'status';
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: desc, template, build: false })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '生成失败');
+
+    // 应用信息 meta
+    const m = data.manifest || {};
+    const items = [
+      ['应用名', m.name || '-'],
+      ['App ID', m.appId || '-'],
+      ['版本', m.version || '-'],
+      ['模板', m.template || '-'],
+      ['权限', Array.isArray(m.permissions) ? m.permissions.join(', ') || '无' : '无'],
+      ['创建时间', m.createdAt || '-']
+    ];
+    $('manifestMeta').innerHTML = items.map(([k, v]) =>
+      `<div class="meta-item"><div class="k">${k}</div><div class="v">${escapeHtml(v)}</div></div>`
+    ).join('');
+
+    $('sourceCode').textContent = data.source;
+    $('buildMsg').textContent = data.build_result || '生成完成，已产出 .aiapp 应用工程。';
+
+    const st = $('status');
+    st.className = 'status ok';
+    st.textContent = '✓ 应用生成成功';
+    $('result').classList.add('show');
+    // 默认切到应用信息
+    document.querySelector('.tab[data-tab=manifest]').click();
+  } catch (e) {
+    const st = $('status');
+    st.className = 'status err';
+    st.textContent = '✗ ' + e.message;
+    $('result').classList.add('show');
+    $('pane-manifest').style.display = 'block';
+    $('manifestMeta').innerHTML = '';
+    $('sourceCode').textContent = '';
+  } finally {
+    btn.disabled = false; btn.textContent = '生成应用';
+  }
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = String(s);
+  return div.innerHTML;
+}
+
+$('genBtn').addEventListener('click', generate);
+$('desc').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate(); });
+loadTemplates();
+</script>
+</body>
+</html>

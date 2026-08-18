@@ -1,0 +1,9 @@
+{
+  "appId": "app_47435461",
+  "name": "app",
+  "version": "0.1.0",
+  "description": "统计本月到账金额的小应用",
+  "hostSdkVersion": ">=0.1.0",
+  "template": "calculator",
+  "createdAt": "2026-08-18T04:09:22Z"
+}
