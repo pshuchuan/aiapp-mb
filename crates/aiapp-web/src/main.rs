@@ -94,7 +94,7 @@ async fn list_templates() -> Json<TemplatesResponse> {
         .map(|(name, description)| TemplateInfo {
             name,
             description,
-            image: &format!("/static/templates/{}.png", name),
+            image: format!("/static/templates/{}.png", name),
         })
         .collect();
     Json(TemplatesResponse { templates })
