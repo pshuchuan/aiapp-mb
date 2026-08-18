@@ -1,25 +1,25 @@
 //! aiapp-gen：由自然语言描述生成 MoonBit 工程源码。
 //!
-//! 流水线第一阶段。支持两种后端：
-//! - `mock`：本地示例，不依赖外部服务，便于离线演示与测试；
-//! - `openai`：OpenAI 兼容 Chat Completions API。
+//! 流水线第一阶段（社区版）。后端：
+//! - `mock`：本地示例，不依赖外部服务，便于离线演示与测试（默认）；
 //!
-//! 生成的 MoonBit 工程遵循统一的 `.aiapp` 应用包格式。
+//! 真实 OpenAI 自动生成属于闭源 **Pro** 组件（`pro/crates/aiapp-gen-pro`），
+//! 不随本开源仓分发；社区版对 `openai` 后端返回引导提示。
 
 pub mod config;
+pub mod gen_client;
 pub mod manifest;
 pub mod mock;
-pub mod openai;
 pub mod templates;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use config::{Backend, GenConfig};
-pub use manifest::AppManifest;
-pub use openai::{
+pub use gen_client::{
     default_system_prompt, generate_with_prompt, SYSTEM_PROMPT_VERSION,
 };
+pub use manifest::AppManifest;
 pub use templates::TEMPLATES;
 
 /// 生成器统一错误类型。
@@ -52,7 +52,7 @@ pub fn generate_source(desc: &str, config: &GenConfig, template: &str) -> Result
     }
     match config.backend {
         Backend::Mock => mock::generate(desc),
-        Backend::OpenAi => openai::generate(desc, config),
+        Backend::OpenAi => gen_client::generate(desc, config),
     }
 }
 
@@ -77,7 +77,7 @@ pub fn generate_source_with_prompt(
     }
     match config.backend {
         Backend::Mock => mock::generate(desc),
-        Backend::OpenAi => openai::generate_with_prompt(desc, config, override_prompt),
+        Backend::OpenAi => gen_client::generate_with_prompt(desc, config, override_prompt),
     }
 }
 

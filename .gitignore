@@ -14,5 +14,8 @@ target/
 # Web 运行时生成的工程（服务启动时写入）
 /generated_web/
 
+# 闭源 Pro / 商业中间件（单独推送私有仓库，不进开源仓）
+/pro/
+
 # 系统
 .DS_Store
