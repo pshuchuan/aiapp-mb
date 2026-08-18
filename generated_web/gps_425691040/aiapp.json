@@ -1,0 +1,9 @@
+{
+  "appId": "app_47435472",
+  "name": "gps",
+  "version": "0.1.0",
+  "description": "我要做一个车机程序，可以根据GPS速度模拟声浪，有动感效果",
+  "hostSdkVersion": ">=0.1.0",
+  "template": "minimal",
+  "createdAt": "2026-08-18T04:16:25Z"
+}

@@ -13,13 +13,28 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::services::ServeDir;
+use tokio::sync::Mutex;
 
 use aiapp_gen::{generate_source, write_project, GenConfig, TEMPLATES};
 
-/// 应用状态：共享工作目录。
+/// 应用市场条目。
+#[derive(Clone, Serialize, Deserialize)]
+struct MarketApp {
+    id: String,
+    name: String,
+    description: String,
+    tags: Vec<String>,
+    platforms: Vec<String>,
+    template: String,
+    source: String,
+    created_at: String,
+}
+
+/// 应用状态：共享工作目录 + 市场列表。
 #[derive(Clone)]
 struct AppState {
     workdir: PathBuf,
+    market: Arc<Mutex<Vec<MarketApp>>>,
 }
 
 /// 生成请求体。
@@ -37,15 +52,10 @@ struct GenerateRequest {
 #[derive(Serialize)]
 struct GenerateResponse {
     ok: bool,
-    /// 生成的 MoonBit 源码。
     source: String,
-    /// 应用清单（aiapp.json 内容）。
     manifest: serde_json::Value,
-    /// 工程目录名。
     project_dir: String,
-    /// 编译信息（build=true 且成功时）.
     build_result: Option<String>,
-    /// 错误信息（ok=false 时）。
     error: Option<String>,
 }
 
@@ -62,13 +72,108 @@ struct TemplateInfo {
     image: String,
 }
 
+/// 市场列表响应。
+#[derive(Serialize)]
+struct MarketResponse {
+    apps: Vec<MarketApp>,
+    tags: Vec<String>,
+    platforms: Vec<String>,
+}
+
+/// 预置示例应用。
+fn seed_market_apps() -> Vec<MarketApp> {
+    vec![
+        MarketApp {
+            id: "daily-sales".into(),
+            name: "每日销售看板".into(),
+            description: "按日期汇总销售额，展示趋势图和TOP商品排行".into(),
+            tags: vec!["数据看板".into(), "办公效率".into()],
+            platforms: vec!["网页".into(), "手机".into(), "车机".into()],
+            template: "calculator".into(),
+            source: String::new(),
+            created_at: "2026-08-18 10:00".into(),
+        },
+        MarketApp {
+            id: "todo-team".into(),
+            name: "团队待办协作".into(),
+            description: "同事间共享待办清单，分配任务、跟踪进度".into(),
+            tags: vec!["办公效率".into(), "协作".into()],
+            platforms: vec!["网页".into(), "手机".into(), "电脑".into(), "鸿蒙".into()],
+            template: "todo".into(),
+            source: String::new(),
+            created_at: "2026-08-18 09:30".into(),
+        },
+        MarketApp {
+            id: "photo-filter".into(),
+            name: "极速图片滤镜".into(),
+            description: "一键给图片添加滤镜效果，支持灰度、暖色、冷色等".into(),
+            tags: vec!["创意工具".into(), "实用工具".into()],
+            platforms: vec!["网页".into(), "手机".into(), "电脑".into()],
+            template: "image-filter".into(),
+            source: String::new(),
+            created_at: "2026-08-17 16:20".into(),
+        },
+        MarketApp {
+            id: "expense-tracker".into(),
+            name: "月度开支记账".into(),
+            description: "记录日常开支，分类统计，生成月度报表".into(),
+            tags: vec!["实用工具".into(), "数据看板".into()],
+            platforms: vec!["网页".into(), "手机".into(), "车机".into(), "电视盒".into()],
+            template: "calculator".into(),
+            source: String::new(),
+            created_at: "2026-08-17 14:00".into(),
+        },
+        MarketApp {
+            id: "inventory-check".into(),
+            name: "库存盘点助手".into(),
+            description: "扫码或手动录入库存数据，自动比对差异".into(),
+            tags: vec!["行业应用".into(), "实用工具".into()],
+            platforms: vec!["手机".into(), "车机".into()],
+            template: "minimal".into(),
+            source: String::new(),
+            created_at: "2026-08-16 11:10".into(),
+        },
+        MarketApp {
+            id: "meeting-notes".into(),
+            name: "会议纪要整理".into(),
+            description: "记录会议要点，自动生成待办事项和会议结论".into(),
+            tags: vec!["办公效率".into(), "协作".into()],
+            platforms: vec!["网页".into(), "电脑".into(), "鸿蒙".into()],
+            template: "todo".into(),
+            source: String::new(),
+            created_at: "2026-08-16 09:00".into(),
+        },
+        MarketApp {
+            id: "weather-dash".into(),
+            name: "天气仪表盘".into(),
+            description: "实时天气展示，包含温度曲线、风速、湿度等信息".into(),
+            tags: vec!["数据看板".into(), "实用工具".into()],
+            platforms: vec!["网页".into(), "手机".into(), "车机".into(), "电视盒".into(), "鸿蒙".into()],
+            template: "calculator".into(),
+            source: String::new(),
+            created_at: "2026-08-15 08:30".into(),
+        },
+        MarketApp {
+            id: "timer-app".into(),
+            name: "多任务计时器".into(),
+            description: "同时运行多个倒计时提醒，适合厨房、运动等场景".into(),
+            tags: vec!["实用工具".into()],
+            platforms: vec!["手机".into(), "车机".into(), "电视盒".into()],
+            template: "minimal".into(),
+            source: String::new(),
+            created_at: "2026-08-14 19:45".into(),
+        },
+    ]
+}
+
 /// 构建路由。
 pub fn router() -> Router {
     let workdir = std::env::current_dir()
         .expect("获取当前目录失败")
         .join("generated_web");
     std::fs::create_dir_all(&workdir).expect("创建工作目录失败");
-    let state = Arc::new(AppState { workdir });
+    let market = Arc::new(Mutex::new(seed_market_apps()));
+    let state = Arc::new(AppState { workdir, market });
 
     // 模板图片目录（编译时获取绝对路径）
     let static_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src/templates");
@@ -78,6 +183,7 @@ pub fn router() -> Router {
         .route("/", get(serve_index))
         .route("/api/templates", get(list_templates))
         .route("/api/generate", post(generate))
+        .route("/api/market", get(list_market))
         .nest_service("/static/templates", serve_static)
         .with_state(state)
 }
@@ -98,6 +204,26 @@ async fn list_templates() -> Json<TemplatesResponse> {
         })
         .collect();
     Json(TemplatesResponse { templates })
+}
+
+/// 获取应用市场列表。
+async fn list_market(State(state): State<Arc<AppState>>) -> Json<MarketResponse> {
+    let apps = state.market.lock().await.clone();
+    // 收集所有去重标签
+    let mut tags: Vec<String> = apps
+        .iter()
+        .flat_map(|a| a.tags.clone())
+        .collect();
+    tags.sort();
+    tags.dedup();
+    // 收集所有去重平台
+    let mut platforms: Vec<String> = apps
+        .iter()
+        .flat_map(|a| a.platforms.clone())
+        .collect();
+    platforms.sort();
+    platforms.dedup();
+    Json(MarketResponse { apps, tags, platforms })
 }
 
 /// 生成应用工程。
@@ -163,6 +289,29 @@ async fn generate(
                 }
             }
 
+            // 存入应用市场
+            {
+                let mut market = state.market.lock().await;
+                let now = chrono_now();
+                let app_id = format!("gen_{}", market.len() + 1);
+                // 从清单中提取信息
+                let name = manifest.get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&description)
+                    .to_string();
+                let app_entry = MarketApp {
+                    id: app_id,
+                    name,
+                    description: description.clone(),
+                    tags: vec!["办公效率".into()], // 默认标签，后续可让用户选择
+                    platforms: vec!["网页".into(), "手机".into(), "电脑".into()],
+                    template: template.to_string(),
+                    source: source.clone(),
+                    created_at: now,
+                };
+                market.push(app_entry);
+            }
+
             Json(GenerateResponse {
                 ok: true,
                 source,
@@ -181,6 +330,23 @@ async fn generate(
             error: Some(e),
         }),
     }
+}
+
+/// 获取当前时间字符串。
+fn chrono_now() -> String {
+    // 不用 chrono crate，手动格式
+    let d = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = d.as_secs();
+    // 简单计算年月日时分
+    let days = secs / 86400;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let mins = (time_of_day % 3600) / 60;
+    // 从 1970-01-01 算起
+    let year = 1970 + (days as f64 / 365.25) as u64;
+    format!("{}-{:02}-{:02} {:02}:{:02}", year, 1 + (days / 30) % 12, 1 + days % 30, hours, mins)
 }
 
 /// 尝试调用 moon 编译工程为 .aiapp 包。

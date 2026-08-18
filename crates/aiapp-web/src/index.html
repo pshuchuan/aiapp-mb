@@ -16,6 +16,8 @@
     --accent-2: #6ea8ff;
     --ok: #34c759;
     --err: #ff5c5c;
+    --tag-bg: #1e2a3a;
+    --tag-border: #2c3d55;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -23,25 +25,31 @@
     background: var(--bg); color: var(--text);
     min-height: 100vh;
   }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
-  header { text-align: center; margin-bottom: 32px; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 28px 20px 60px; }
+  header { text-align: center; margin-bottom: 24px; }
   header .logo {
     font-size: 26px; font-weight: 800; letter-spacing: 1px;
     background: linear-gradient(135deg, #6ea8ff, #a78bfa);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   }
-  header .sub { color: var(--muted); font-size: 16px; margin-top: 8px; line-height: 1.5; }
-  header .sub em { color: var(--accent-2); font-style: normal; }
-  .tagline {
-    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
-    margin-top: 16px;
+  header .sub { color: var(--muted); font-size: 15px; margin-top: 6px; line-height: 1.5; }
+
+  /* 主导航 Tab */
+  .nav-tabs {
+    display: flex; gap: 0; justify-content: center; margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
   }
-  .chip {
-    font-size: 12px; color: var(--muted);
-    border: 1px solid var(--border); border-radius: 999px;
-    padding: 4px 12px;
+  .nav-tab {
+    background: none; border: none; color: var(--muted); font-size: 15px;
+    font-weight: 600; padding: 12px 28px; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all .15s;
   }
-  .chip.active { color: var(--accent-2); border-color: var(--accent); }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.on { color: var(--accent-2); border-bottom-color: var(--accent); }
+
+  /* 生成器 */
+  .section { display: none; }
+  .section.show { display: block; }
   .card {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 14px; padding: 24px;
@@ -81,13 +89,13 @@
     display: flex; gap: 12px; align-items: center;
     margin-top: 18px; justify-content: flex-end;
   }
-  button {
+  button.btn {
     background: var(--accent); color: #fff; border: none; border-radius: 10px;
     padding: 12px 28px; font-size: 15px; font-weight: 600; cursor: pointer;
     transition: background .15s;
   }
-  button:hover { background: var(--accent-2); }
-  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.btn:hover { background: var(--accent-2); }
+  button.btn:disabled { opacity: .5; cursor: not-allowed; }
   .hint { font-size: 13px; color: var(--muted); margin-top: 14px; line-height: 1.6; }
   .result { display: none; margin-top: 20px; }
   .result.show { display: block; }
@@ -115,53 +123,150 @@
   .meta-item .k { font-size: 12px; color: var(--muted); }
   .meta-item .v { font-size: 14px; margin-top: 4px; word-break: break-all; }
   .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 50px; line-height: 1.8; }
+
+  /* ===== 应用市场 ===== */
+  .market-header {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    margin-bottom: 18px;
+  }
+  .market-header h2 { font-size: 18px; font-weight: 700; }
+  .market-header .count { color: var(--muted); font-size: 14px; }
+
+  /* 筛选行 */
+  .filter-row { margin-bottom: 16px; }
+  .filter-row .label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-chip {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 14px; font-size: 13px;
+    color: var(--muted); cursor: pointer; transition: all .15s;
+    user-select: none;
+  }
+  .filter-chip:hover { border-color: var(--muted); color: var(--text); }
+  .filter-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* 应用卡片网格 */
+  .app-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  }
+  @media (max-width: 1000px) { .app-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 750px) { .app-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 450px) { .app-grid { grid-template-columns: 1fr; } }
+  .app-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; transition: border-color .15s, transform .1s;
+  }
+  .app-card:hover { border-color: var(--muted); transform: translateY(-2px); }
+  .app-card .app-thumb {
+    width: 100%; height: 120px; object-fit: cover; display: block;
+    background: linear-gradient(135deg, #1a1d24 0%, #2a2d38 100%);
+  }
+  .app-card .app-body { padding: 14px; }
+  .app-card .app-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .app-card .app-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+  .app-card .app-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+  .app-tag {
+    font-size: 11px; background: var(--tag-bg); color: var(--accent-2);
+    border: 1px solid var(--tag-border); border-radius: 4px; padding: 2px 7px;
+  }
+  .app-card .app-platforms { display: flex; gap: 4px; flex-wrap: wrap; }
+  .plat-badge {
+    font-size: 11px; background: var(--panel-2); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px;
+  }
+  .app-card .app-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  }
+  .app-card .app-time { font-size: 11px; color: var(--muted); }
+  .app-card .app-use {
+    font-size: 12px; color: var(--accent-2); cursor: pointer;
+    font-weight: 600; text-decoration: none;
+  }
+  .app-card .app-use:hover { text-decoration: underline; }
+
+  .market-empty {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+  }
+  .market-empty .big { font-size: 40px; margin-bottom: 12px; }
+  .market-empty p { font-size: 14px; line-height: 1.6; }
+
+  .market-tip {
+    font-size: 12px; color: var(--muted); text-align: center;
+    margin-top: 14px;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="logo">✦ 小应用工坊</div>
-    <div class="sub">跟电脑说句话，它就能帮你做一个小应用。<br>手机上、电脑上、电视上、车里……到处都能用。</div>
-    <div class="tagline">
-      <span class="chip active">网页</span>
-      <span class="chip">手机</span>
-      <span class="chip">电脑</span>
-      <span class="chip">车机</span>
-      <span class="chip">电视盒</span>
-      <span class="chip">鸿蒙</span>
-    </div>
+    <div class="sub">跟电脑说句话，它就能帮你做一个小应用。手机上、电脑上、电视上、车里……到处都能用。</div>
   </header>
 
-  <div class="card">
-    <label for="desc" style="font-size:15px;font-weight:600">你想要一个什么样的应用？</label>
-    <textarea id="desc" placeholder="举个例子：&#10;做一个统计本月到账金额的小工具，按日期汇总&#10;或者：做一个待办清单，可以添加、勾选、删除事项"></textarea>
-
-    <div class="card-box">
-      <div style="font-size:13px;color:var(--muted);font-weight:500">选个模板（或者直接点生成）</div>
-      <div class="tpl-grid" id="tplGrid"></div>
-    </div>
-
-    <div class="action-row">
-      <button id="genBtn">✨ 给我生成</button>
-    </div>
-    <div class="hint" id="hint">目前用内置模板演示，接入 AI 后你说什么它就能做什么。</div>
+  <!-- 全局导航 -->
+  <div class="nav-tabs">
+    <button class="nav-tab on" data-section="gen">✨ 生成应用</button>
+    <button class="nav-tab" data-section="market">📦 应用市场</button>
   </div>
 
-  <div class="result" id="result">
-    <div class="result-head">
-      <div class="status" id="status"></div>
-      <div class="tabs">
-        <button class="tab on" data-tab="manifest">应用信息</button>
-        <button class="tab" data-tab="source">应用源码</button>
+  <!-- ========== 生成器 ========== -->
+  <div class="section show" id="sec-gen">
+    <div class="card">
+      <label for="desc" style="font-size:15px;font-weight:600">你想要一个什么样的应用？</label>
+      <textarea id="desc" placeholder="举个例子：&#10;做一个统计本月到账金额的小工具，按日期汇总&#10;或者：做一个待办清单，可以添加、勾选、删除事项"></textarea>
+
+      <div class="card-box">
+        <div style="font-size:13px;color:var(--muted);font-weight:500">选个模板（或者直接点生成）</div>
+        <div class="tpl-grid" id="tplGrid"></div>
       </div>
+
+      <div class="action-row">
+        <button class="btn" id="genBtn">✨ 给我生成</button>
+      </div>
+      <div class="hint" id="hint">目前用内置模板演示，接入 AI 后你说什么它就能做什么。</div>
     </div>
-    <div id="pane-manifest" class="pane">
-      <div class="meta" id="manifestMeta"></div>
+
+    <div class="result" id="result">
+      <div class="result-head">
+        <div class="status" id="status"></div>
+        <div class="tabs">
+          <button class="tab on" data-tab="manifest">应用信息</button>
+          <button class="tab" data-tab="source">应用源码</button>
+        </div>
+      </div>
+      <div id="pane-manifest" class="pane">
+        <div class="meta" id="manifestMeta"></div>
+      </div>
+      <div id="pane-source" class="pane" style="display:none">
+        <pre id="sourceCode"></pre>
+      </div>
+      <div class="hint" id="buildMsg" style="margin-top:10px"></div>
     </div>
-    <div id="pane-source" class="pane" style="display:none">
-      <pre id="sourceCode"></pre>
+  </div>
+
+  <!-- ========== 应用市场 ========== -->
+  <div class="section" id="sec-market">
+    <div class="market-header">
+      <h2>📦 应用市场</h2>
+      <span class="count" id="marketCount"></span>
     </div>
-    <div class="hint" id="buildMsg" style="margin-top:10px"></div>
+
+    <!-- 平台筛选 -->
+    <div class="filter-row">
+      <div class="label">按平台筛选</div>
+      <div class="filter-chips" id="platformFilters"></div>
+    </div>
+
+    <!-- 标签筛选 -->
+    <div class="filter-row">
+      <div class="label">按标签筛选</div>
+      <div class="filter-chips" id="tagFilters"></div>
+    </div>
+
+    <!-- 应用卡片 -->
+    <div class="app-grid" id="appGrid"></div>
+    <div class="market-tip">生成的应用会自动出现在这里 · 标记为"全平台"的应用可在所有设备上运行</div>
   </div>
 
   <div class="footer">
@@ -175,7 +280,18 @@ const $ = id => document.getElementById(id);
 let templates = [];
 let selectedTemplate = 'minimal';
 
-// 加载模板列表
+// ====== 导航切换 ======
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('on'));
+    tab.classList.add('on');
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('show'));
+    $(`sec-${tab.dataset.section}`).classList.add('show');
+    if (tab.dataset.section === 'market') loadMarket();
+  });
+});
+
+// ====== 模板加载 ======
 async function loadTemplates() {
   try {
     const res = await fetch('/api/templates');
@@ -218,7 +334,7 @@ function getTemplateHint(name) {
   return hints[name] || '';
 }
 
-// Tab 切换
+// 生成器结果 Tab
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
@@ -229,7 +345,7 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-// 生成
+// ====== 生成 ======
 async function generate() {
   const desc = $('desc').value.trim();
   if (!desc) { $('desc').focus(); return; }
@@ -278,6 +394,98 @@ async function generate() {
   } finally {
     btn.disabled = false; btn.textContent = '✨ 给我生成';
   }
+}
+
+// ====== 应用市场 ======
+let marketApps = [];
+let platformFilter = '全部';
+let tagFilter = '全部';
+
+async function loadMarket() {
+  try {
+    const res = await fetch('/api/market');
+    const data = await res.json();
+    marketApps = data.apps || [];
+    renderFilters(data.platforms, data.tags);
+    renderMarketApps();
+  } catch (e) {
+    $('appGrid').innerHTML = `<div class="market-empty"><div class="big">⚠️</div><p>加载失败：${e.message}</p></div>`;
+  }
+}
+
+function renderFilters(platforms, tags) {
+  // 平台筛选
+  const pf = $('platformFilters');
+  pf.innerHTML = '';
+  ['全部', ...platforms].forEach(p => {
+    const chip = document.createElement('span');
+    chip.className = 'filter-chip' + (p === platformFilter ? ' on' : '');
+    chip.textContent = p;
+    chip.addEventListener('click', () => {
+      platformFilter = p;
+      document.querySelectorAll('#platformFilters .filter-chip').forEach(c => c.classList.remove('on'));
+      chip.classList.add('on');
+      renderMarketApps();
+    });
+    pf.appendChild(chip);
+  });
+
+  // 标签筛选
+  const tf = $('tagFilters');
+  tf.innerHTML = '';
+  ['全部', ...tags].forEach(t => {
+    const chip = document.createElement('span');
+    chip.className = 'filter-chip' + (t === tagFilter ? ' on' : '');
+    chip.textContent = t;
+    chip.addEventListener('click', () => {
+      tagFilter = t;
+      document.querySelectorAll('#tagFilters .filter-chip').forEach(c => c.classList.remove('on'));
+      chip.classList.add('on');
+      renderMarketApps();
+    });
+    tf.appendChild(chip);
+  });
+}
+
+function renderMarketApps() {
+  const grid = $('appGrid');
+  let filtered = marketApps;
+
+  if (platformFilter !== '全部') {
+    filtered = filtered.filter(a => a.platforms.includes(platformFilter));
+  }
+  if (tagFilter !== '全部') {
+    filtered = filtered.filter(a => a.tags.includes(tagFilter));
+  }
+
+  $('marketCount').textContent = `共 ${filtered.length} 个应用`;
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="market-empty"><div class="big">📭</div><p>没有匹配的应用<br>试试切换筛选条件</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(a => {
+    const tags = (a.tags || []).map(t => `<span class="app-tag">${t}</span>`).join('');
+    const platforms = (a.platforms || []).map(p => `<span class="plat-badge">${p}</span>`).join('');
+    // 用模板预览图作为占位图
+    const thumbSrc = `/static/templates/${a.template}.png`;
+    return `
+      <div class="app-card">
+        <img class="app-thumb" src="${thumbSrc}" alt="${a.name}" loading="lazy" onerror="this.style.background='linear-gradient(135deg,#1a1d24,#2a2d38)'">
+        <div class="app-body">
+          <div class="app-name">${escapeHtml(a.name)}</div>
+          <div class="app-desc">${escapeHtml(a.description)}</div>
+          <div class="app-tags">${tags}</div>
+          <div class="app-platforms">${platforms}</div>
+          <div class="app-meta">
+            <span class="app-time">${a.created_at}</span>
+            <span class="app-use" onclick="alert('应用「${escapeHtml(a.name)}」已就绪，可在 ${(a.platforms||[]).join('、')} 上运行')">使用 →</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function escapeHtml(s) {
