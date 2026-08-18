@@ -88,6 +88,25 @@
   .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 20px 80px; }
 
   /* 筛选行 */
+  .avail-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .avail-switch { display: flex; gap: 6px; align-items: center; }
+  .avail-btn {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 18px; font-size: 13px;
+    color: var(--muted); cursor: pointer; transition: all .15s;
+  }
+  .avail-btn:hover { border-color: var(--muted); color: var(--text); }
+  .avail-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .avail-btn.on.warn { background: #8a5a00; border-color: #b8860b; color: #ffe08a; }
+  .current-device {
+    font-size: 12px; color: var(--muted); margin-left: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .current-device .dev-badge {
+    background: var(--tag-bg); color: var(--accent-2);
+    border: 1px solid var(--tag-border); border-radius: 4px; padding: 2px 8px;
+    font-size: 11px;
+  }
   .filter-bar {
     display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
     margin-bottom: 16px;
@@ -122,6 +141,7 @@
   }
   .app-card .app-body { padding: 14px; }
   .app-card .app-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .app-card .app-name .not-sup { font-size: 13px; margin-left: 4px; }
   .app-card .app-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
   .app-card .app-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
   .app-tag {
@@ -239,6 +259,7 @@
 <!-- ===== 主页：应用市场 ===== -->
 <div class="wrap">
   <!-- 筛选 -->
+  <div class="avail-bar" id="availBar"></div>
   <div class="filter-bar" id="filterBar"></div>
 
   <!-- 应用网格 -->
@@ -282,12 +303,40 @@
 // ====== 状态 ======
 let templates = [];
 let marketApps = [];
-let platformFilter = '全部';
+let availFilter = '可用';      // '可用' | '不可用'
 let tagFilter = '全部';
+let currentPlatforms = [];     // 自动侦测的当前平台
 let currentAppId = null;      // 当前前台打开的应用
 let backgroundApps = [];      // 后台运行的应用 [{id, name, template}]
 
 const $ = id => document.getElementById(id);
+
+// ====== 自动侦测当前平台 ======
+function detectPlatforms() {
+  const ua = navigator.userAgent;
+  const isTouch = navigator.maxTouchPoints > 0;
+  const isMobile = /Mobi|Android|iPhone|iPad|HarmonyOS/i.test(ua);
+  const w = window.innerWidth;
+  const platforms = [];
+  if (isMobile) {
+    platforms.push('手机');
+  } else if (w >= 1024) {
+    platforms.push('电脑', '笔记本');
+  } else {
+    platforms.push('平板');
+  }
+  platforms.push('网页');
+  if (/Macintosh|Mac OS/i.test(ua)) platforms.push('macOS');
+  if (/Windows/i.test(ua)) platforms.push('Windows');
+  if (/HarmonyOS|鸿蒙/i.test(ua)) platforms.push('鸿蒙');
+  // 去重
+  return [...new Set(platforms)];
+}
+
+// 判断应用是否支持当前设备：平台列表中任一命中当前平台
+function supportsCurrent(a) {
+  return (a.platforms || []).some(p => currentPlatforms.includes(p));
+}
 
 // ====== 生成器切换 ======
 function toggleGenerator() {
@@ -360,41 +409,50 @@ async function loadMarket() {
     const res = await fetch('/api/market');
     const data = await res.json();
     marketApps = data.apps || [];
-    renderFilters(data.platforms, data.tags);
+    renderAvailBar();
+    renderTagBar(data.tags);
     renderMarketApps();
   } catch (e) {
     $('appGrid').innerHTML = `<div class="market-empty"><div class="big">⚠️</div><p>加载失败：${e.message}</p></div>`;
   }
 }
 
-function renderFilters(platforms, tags) {
-  const bar = $('filterBar');
-  // 平台
-  let html = '<span class="label">平台</span>';
-  ['全部', ...platforms].forEach(p => {
-    const on = p === platformFilter ? ' on' : '';
-    html += `<span class="filter-chip${on}" data-p="${p}">${p}</span>`;
+// 可用性切换栏（当前可用 / 当前设备不支持）
+function renderAvailBar() {
+  const bar = $('availBar');
+  const tag = currentPlatforms.includes('车机') ? '车机'
+    : currentPlatforms.includes('手机') ? '手机'
+    : currentPlatforms.includes('平板') ? '平板'
+    : '电脑';
+  bar.innerHTML = `
+    <span class="current-device">当前设备：<span class="dev-badge">${tag}</span></span>
+    <span class="avail-switch">
+      <button class="avail-btn ${availFilter === '可用' ? 'on' : ''}" data-avail="可用">✅ 当前可用</button>
+      <button class="avail-btn ${availFilter === '不可用' ? 'on warn' : ''}" data-avail="不可用">🚫 其他平台可用</button>
+    </span>
+  `;
+  bar.querySelectorAll('.avail-btn').forEach(btn => {
+    btn.onclick = () => {
+      availFilter = btn.dataset.avail;
+      renderAvailBar();
+      renderMarketApps();
+    };
   });
-  html += '<span class="label" style="margin-left:8px">标签</span>';
+}
+
+// 标签筛选条
+function renderTagBar(tags) {
+  const bar = $('filterBar');
+  let html = '<span class="label">分类</span>';
   ['全部', ...tags].forEach(t => {
     const on = t === tagFilter ? ' on' : '';
     html += `<span class="filter-chip tag${on}" data-t="${t}">${t}</span>`;
   });
   bar.innerHTML = html;
-
-  bar.querySelectorAll('.filter-chip[data-p]').forEach(c => {
-    c.onclick = () => {
-      platformFilter = c.dataset.p;
-      bar.querySelectorAll('.filter-chip[data-p]').forEach(x => x.classList.remove('on'));
-      c.classList.add('on');
-      renderMarketApps();
-    };
-  });
   bar.querySelectorAll('.filter-chip[data-t]').forEach(c => {
     c.onclick = () => {
       tagFilter = c.dataset.t;
-      bar.querySelectorAll('.filter-chip[data-t]').forEach(x => x.classList.remove('on'));
-      c.classList.add('on');
+      renderTagBar(tags);
       renderMarketApps();
     };
   });
@@ -403,12 +461,19 @@ function renderFilters(platforms, tags) {
 function renderMarketApps() {
   const grid = $('appGrid');
   let filtered = marketApps;
-  if (platformFilter !== '全部') filtered = filtered.filter(a => a.platforms.includes(platformFilter));
+  // 可用性过滤：当前可用 / 当前设备不支持
+  filtered = availFilter === '可用'
+    ? filtered.filter(supportsCurrent)
+    : filtered.filter(a => !supportsCurrent(a));
+  // 标签过滤
   if (tagFilter !== '全部') filtered = filtered.filter(a => a.tags.includes(tagFilter));
   $('marketCount').textContent = `共 ${filtered.length} 个应用`;
 
   if (filtered.length === 0) {
-    grid.innerHTML = `<div class="market-empty"><div class="big">📭</div><p>没有匹配的应用<br>试试切换筛选条件</p></div>`;
+    const tip = availFilter === '可用'
+      ? '当前设备可用的应用都在这了<br>可以点顶部「✨ 生成新应用」做一个'
+      : '这些平台应用都能在其他平台运行<br>切回「当前可用」看本机可用的应用';
+    grid.innerHTML = `<div class="market-empty"><div class="big">📭</div><p>${tip}</p></div>`;
     return;
   }
 
@@ -416,10 +481,11 @@ function renderMarketApps() {
     const tags = (a.tags || []).map(t => `<span class="app-tag">${t}</span>`).join('');
     const platforms = (a.platforms || []).map(p => `<span class="plat-badge">${p}</span>`).join('');
     const thumbSrc = `/static/templates/${a.template}.png`;
+    const canRun = supportsCurrent(a);
     return `<div class="app-card" onclick="openApp('${a.id}')">
       <img class="app-thumb" src="${thumbSrc}" alt="${a.name}" loading="lazy" onerror="this.style.background='linear-gradient(135deg,#1a1d24,#2a2d38)'">
       <div class="app-body">
-        <div class="app-name">${esc(a.name)}</div>
+        <div class="app-name">${esc(a.name)}${canRun ? '' : '<span class="not-sup" title="当前设备不支持">⛔</span>'}</div>
         <div class="app-desc">${esc(a.description)}</div>
         <div class="app-tags">${tags}</div>
         <div class="app-platforms">${platforms}</div>
@@ -527,6 +593,8 @@ function esc(s) {
 
 // ====== 初始化 ======
 (async function init() {
+  // 自动侦测当前平台
+  currentPlatforms = detectPlatforms();
   // 加载模板
   const tres = await fetch('/api/templates');
   const tdata = await tres.json();
