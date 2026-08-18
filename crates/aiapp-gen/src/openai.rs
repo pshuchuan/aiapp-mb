@@ -8,14 +8,29 @@ use std::process::Command;
 use crate::config::GenConfig;
 use crate::GenError;
 
-const SYSTEM_PROMPT: &str = r#"你是一名 MoonBit 语言专家。根据用户的自然语言描述，生成一个可直接运行的 MoonBit 程序。
-要求：
-1. 只输出 MoonBit 源码本身，不要任何解释，不要 markdown 代码块标记或额外文字。
-2. 程序入口必须是 `fn main`。
-3. 只能使用 MoonBit 标准库，不要引入外部依赖。"#;
+/// 生成技能提示词的版本号。版本化后便于后台管理端持续迭代，
+/// 每次调整提示词都应递增版本号并记录改动，避免影响已有迭代链路。
+pub const SYSTEM_PROMPT_VERSION: &str = "1.0.0";
 
-/// 调用 OpenAI 兼容接口生成 MoonBit 源码。
-pub fn generate(desc: &str, config: &GenConfig) -> Result<String, GenError> {
+/// 默认系统提示词（编译时内嵌，随包分发）。
+///
+/// 提示词支持后续持续迭代：文本独立维护、带版本号、结构化分区，
+/// 后台管理端可查看与覆盖当前生效的提示词（运行时覆盖优先级更高）。
+const SYSTEM_PROMPT: &str = include_str!("system_prompt.md");
+
+/// 返回当前生效的系统提示词。
+/// 若某处开启了运行时覆盖（见 `openai::generate_with_prompt`），请传入覆盖版本。
+pub fn default_system_prompt() -> &'static str {
+    SYSTEM_PROMPT
+}
+
+/// 调用 OpenAI 兼容接口生成 MoonBit 源码，使用给定系统提示词
+/// （支持后台管理端在线迭代提示词）。
+pub fn generate_with_prompt(
+    desc: &str,
+    config: &GenConfig,
+    system_prompt: &str,
+) -> Result<String, GenError> {
     if config.api_key.is_empty() {
         return Err(GenError::Backend(
             "openai",
@@ -26,7 +41,7 @@ pub fn generate(desc: &str, config: &GenConfig) -> Result<String, GenError> {
     let body = serde_json::json!({
         "model": config.model,
         "messages": [
-            { "role": "system", "content": SYSTEM_PROMPT },
+            { "role": "system", "content": system_prompt },
             { "role": "user", "content": desc },
         ],
         "temperature": 0.2,
@@ -62,6 +77,11 @@ pub fn generate(desc: &str, config: &GenConfig) -> Result<String, GenError> {
             GenError::Backend("openai", format!("响应中缺少 content 字段: {resp}"))
         })?;
     Ok(strip_fences(content))
+}
+
+/// 调用 OpenAI 兼容接口生成 MoonBit 源码（使用默认内置提示词）。
+pub fn generate(desc: &str, config: &GenConfig) -> Result<String, GenError> {
+    generate_with_prompt(desc, config, default_system_prompt())
 }
 
 /// 去除模型可能误加的 markdown 代码块围栏。

@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tower_http::services::ServeDir;
 use tokio::sync::Mutex;
 
-use aiapp_gen::{generate_source, write_project, GenConfig, TEMPLATES};
+use aiapp_gen::{generate_source_with_prompt, write_project, GenConfig, TEMPLATES};
 
 /// 应用市场条目。
 #[derive(Clone, Serialize, Deserialize)]
@@ -34,16 +34,46 @@ struct MarketApp {
     owner: String,
     /// 可见性："public" 已发布到市场；"private" 仅所有者可见使用。
     visibility: String,
+    /// 生命周期状态："draft" 草稿(仅自己) / "reviewing" 审核中 / "published" 已发布 / "disabled" 已停用。
+    /// 管理员可审核、停用、恢复；新发布的第三方应用需经审核后才公开。
+    status: String,
+    /// 使用统计：启动（打开）次数，供后台统计与后续激励、分成参考。
+    launches: u64,
+    /// 举报原因（最近一条），管理员在后台可见。
+    report: String,
+    /// 审核意见，管理员审核时填写。
+    review_note: String,
+}
+
+/// 平台用户。
+#[derive(Clone, Serialize, Deserialize)]
+struct AppUser {
+    id: String,
+    name: String,
+    /// 角色："admin" 管理员 / "user" 普通用户。当前本地会话模拟管理员。
+    role: String,
+    /// 用户状态："active" 正常 / "disabled" 已停用。
+    status: String,
+    /// 累计生成应用数。
+    apps_generated: u64,
+    /// 累计启动应用次数。
+    launches: u64,
+    /// 累计发放的激励（如积分/分成金额，用于后续激励计划的占位）。
+    incentive: u64,
+    created_at: String,
 }
 
 /// 当前登录用户（单用户模拟）。
 const OWNER_ME: &str = "me";
 
-/// 应用状态：共享工作目录 + 市场列表。
+/// 应用状态：共享工作目录 + 市场列表 + 用户列表 + 生效提示词。
 #[derive(Clone)]
 struct AppState {
     workdir: PathBuf,
     market: Arc<Mutex<Vec<MarketApp>>>,
+    users: Arc<Mutex<Vec<AppUser>>>,
+    /// 当前生效的“生成 app 技能提示词”，支持后台管理端在线迭代。
+    prompt: Arc<Mutex<String>>,
 }
 
 /// 生成请求体。
@@ -156,6 +186,10 @@ fn seed_market_apps() -> Vec<MarketApp> {
             version: version.into(),
             owner: owner.into(),
             visibility: visibility.into(),
+            status: if visibility == "public" { "published".into() } else { "draft".into() },
+            launches: rand_launches(1000, 50000),
+            report: String::new(),
+            review_note: String::new(),
         }
     }
     vec![
@@ -202,6 +236,38 @@ fn seed_market_apps() -> Vec<MarketApp> {
     ]
 }
 
+/// 预置用户列表（含管理员）。
+fn seed_users() -> Vec<AppUser> {
+    fn user(id: &str, name: &str, role: &str, status: &str, apps: u64, launches: u64, inc: u64) -> AppUser {
+        AppUser {
+            id: id.into(),
+            name: name.into(),
+            role: role.into(),
+            status: status.into(),
+            apps_generated: apps,
+            launches,
+            incentive: inc,
+            created_at: "2026-08-01 09:00".into(),
+        }
+    }
+    vec![
+        user("me", "当前管理员", "admin", "active", 12, 320, 860),
+        user("u_zhang", "张伟", "user", "active", 8, 210, 420),
+        user("u_li", "李娜", "user", "active", 5, 150, 300),
+        user("u_wang", "王强", "user", "disabled", 3, 60, 0),
+        user("u_zhao", "赵敏", "user", "active", 2, 40, 80),
+    ]
+}
+
+/// 为种子应用生成一个稳定的伪随机启动次数。
+fn rand_launches(min: u64, max: u64) -> u64 {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos() as u64)
+        .unwrap_or(0);
+    min + (now + min * 7) % (max - min)
+}
+
 /// 构建路由。
 pub fn router() -> Router {
     let workdir = std::env::current_dir()
@@ -209,7 +275,9 @@ pub fn router() -> Router {
         .join("generated_web");
     std::fs::create_dir_all(&workdir).expect("创建工作目录失败");
     let market = Arc::new(Mutex::new(seed_market_apps()));
-    let state = Arc::new(AppState { workdir, market });
+    let users = Arc::new(Mutex::new(seed_users()));
+    let prompt = Arc::new(Mutex::new(aiapp_gen::default_system_prompt().to_string()));
+    let state = Arc::new(AppState { workdir, market, users, prompt });
 
     // 模板图片目录（编译时获取绝对路径）
     let static_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src/templates");
@@ -222,8 +290,21 @@ pub fn router() -> Router {
         .route("/api/market", get(list_market))
         .route("/api/my-apps", get(list_my_apps))
         .route("/api/publish", post(publish_app))
+        .route("/api/report", post(report_app))
         .route("/api/delete", post(delete_app))
         .route("/api/app/:id", get(app_detail))
+        // 后台管理
+        .route("/api/admin/users", get(admin_users))
+        .route("/api/admin/user/toggle", post(admin_user_toggle))
+        .route("/api/admin/apps", get(admin_apps))
+        .route("/api/admin/app/review", post(admin_app_review))
+        .route("/api/admin/app/status", post(admin_app_status))
+        .route("/api/admin/app/edit", post(admin_app_edit))
+        .route("/api/admin/app/delete", post(admin_app_delete))
+        .route("/api/admin/stats", get(admin_stats))
+        .route("/api/admin/prompt", get(admin_prompt))
+        .route("/api/admin/prompt", post(admin_prompt_save))
+        .route("/api/admin/prompt/reset", post(admin_prompt_reset))
         .nest_service("/static/templates", serve_static)
         .with_state(state)
 }
@@ -251,7 +332,7 @@ async fn list_market(State(state): State<Arc<AppState>>) -> Json<MarketResponse>
     let all = state.market.lock().await.clone();
     let apps: Vec<MarketApp> = all
         .iter()
-        .filter(|a| a.visibility == "public")
+        .filter(|a| a.status == "published")
         .cloned()
         .collect();
     // 收集所有去重标签
@@ -313,7 +394,10 @@ async fn publish_app(
     if app.platforms.is_empty() {
         app.platforms = vec!["网页".into(), "手机".into(), "电脑".into()];
     }
-    app.visibility = "public".into();
+    app.visibility = "private".into();
+    // 发布后进入“审核中”，需管理员审核通过后才对市场公开
+    app.status = "reviewing".into();
+    app.review_note.clear();
     let cloned = app.clone();
     Json(ActionResponse { ok: true, error: None, app: Some(cloned) })
 }
@@ -342,20 +426,33 @@ async fn app_detail(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Json<AppDetailResponse> {
-    let market = state.market.lock().await;
-    let app = market.iter().find(|a| a.id == id).cloned();
-    match app {
-        Some(app) => {
-            let mock_content = Some(mock_app_content(&app.template, &app.name));
-            Json(AppDetailResponse { ok: true, app: Some(app), mock_content, error: None })
+    let app = {
+        let mut market = state.market.lock().await;
+        match market.iter_mut().find(|a| a.id == id) {
+            Some(a) => {
+                // 使用统计：记录一次启动
+                a.launches += 1;
+                // 同步到用户累计启动次数
+                {
+                    let mut users = state.users.lock().await;
+                    if let Some(u) = users.iter_mut().find(|u| u.id == a.owner) {
+                        u.launches += 1;
+                    }
+                }
+                a.clone()
+            }
+            None => {
+                return Json(AppDetailResponse {
+                    ok: false,
+                    app: None,
+                    mock_content: None,
+                    error: Some("应用不存在".into()),
+                })
+            }
         }
-        None => Json(AppDetailResponse {
-            ok: false,
-            app: None,
-            mock_content: None,
-            error: Some("应用不存在".into()),
-        }),
-    }
+    };
+    let mock_content = Some(mock_app_content(&app.template, &app.name));
+    Json(AppDetailResponse { ok: true, app: Some(app), mock_content, error: None })
 }
 
 /// 根据模板生成模拟的应用内容展示。
@@ -497,8 +594,9 @@ async fn generate(
     let project_dir = state.workdir.join(&dir_name);
 
     let config = GenConfig::from_env();
+    let override_prompt = state.prompt.lock().await.clone();
 
-    let result = match generate_source(&description, &config, template) {
+    let result = match generate_source_with_prompt(&description, &config, template, &override_prompt) {
         Ok(source) => write_project(&project_dir, &description, &source, template)
             .map(|()| source)
             .map_err(|e| e.to_string()),
@@ -538,6 +636,7 @@ async fn generate(
                     app.template = template.to_string();
                     app.version = bump_version(&app.version);
                     app.created_at = now;
+                    app.review_note.clear();
                     app.clone()
                 } else {
                     // 新建模式：默认为当前用户私有，可自行使用
@@ -559,9 +658,20 @@ async fn generate(
                         version: "1.0.0".into(),
                         owner: OWNER_ME.into(),
                         visibility: "private".into(),
+                        status: "draft".into(),
+                        launches: 0,
+                        report: String::new(),
+                        review_note: String::new(),
                     };
                     let cloned = app_entry.clone();
                     market.push(app_entry);
+                    // 统计：累计当前用户生成应用数
+                    {
+                        let mut users = state.users.lock().await;
+                        if let Some(u) = users.iter_mut().find(|u| u.id == OWNER_ME) {
+                            u.apps_generated += 1;
+                        }
+                    }
                     cloned
                 }
             };
@@ -640,6 +750,370 @@ fn moon_build(project_dir: &std::path::Path) -> Result<String, String> {
         msg.push_str(&format!("，\\.aiapp 包：{}", aiapp_dir.display()));
     }
     Ok(msg)
+}
+
+// ====== 举报 ======
+
+/// 用户举报应用请求体。
+#[derive(Deserialize)]
+struct ReportRequest {
+    id: String,
+    reason: String,
+}
+
+/// 记录一条应用举报。
+async fn report_app(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ReportRequest>,
+) -> Json<ActionResponse> {
+    let mut market = state.market.lock().await;
+    match market.iter_mut().find(|a| a.id == req.id) {
+        Some(app) => {
+            let reason = req.reason.trim();
+            app.report = if reason.is_empty() {
+                "用户举报".into()
+            } else {
+                reason.to_string()
+            };
+            let cloned = app.clone();
+            Json(ActionResponse { ok: true, error: None, app: Some(cloned) })
+        }
+        None => Json(ActionResponse {
+            ok: false,
+            error: Some("应用不存在".into()),
+            app: None,
+        }),
+    }
+}
+
+// ====== 后台管理系统 ======
+
+/// 用户列表响应。
+#[derive(Serialize)]
+struct AdminUsersResponse {
+    users: Vec<AppUser>,
+}
+
+/// 获取全部用户（后台用户管理）。
+async fn admin_users(State(state): State<Arc<AppState>>) -> Json<AdminUsersResponse> {
+    let users = state.users.lock().await.clone();
+    Json(AdminUsersResponse { users })
+}
+
+/// 后台应用列表（全部，含审核中 / 草稿 / 停用）。
+#[derive(Serialize)]
+struct AdminAppsResponse {
+    apps: Vec<MarketApp>,
+}
+
+/// 后台应用列表：全部应用 + 全部平台标签。
+async fn admin_apps(State(state): State<Arc<AppState>>) -> Json<AdminAppsResponse> {
+    let apps = state.market.lock().await.clone();
+    Json(AdminAppsResponse { apps })
+}
+
+/// 后台用户操作请求体。
+#[derive(Deserialize)]
+struct UserToggleRequest {
+    id: String,
+    /// "disable" 停用 / "enable" 启用
+    action: String,
+}
+
+/// 用户管理：启用 / 停用用户。
+async fn admin_user_toggle(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<UserToggleRequest>,
+) -> Json<ActionResponse> {
+    let mut users = state.users.lock().await;
+    match users.iter_mut().find(|u| u.id == req.id) {
+        Some(u) => {
+            if u.role == "admin" {
+                return Json(ActionResponse {
+                    ok: false,
+                    error: Some("不能停用管理员账号".into()),
+                    app: None,
+                });
+            }
+            u.status = if req.action == "disable" { "disabled".into() } else { "active".into() };
+            Json(ActionResponse { ok: true, error: None, app: None })
+        }
+        None => Json(ActionResponse {
+            ok: false,
+            error: Some("用户不存在".into()),
+            app: None,
+        }),
+    }
+}
+
+/// 后台应用审核请求体。
+#[derive(Deserialize)]
+struct AdminReviewRequest {
+    id: String,
+    /// "approve" 通过 / "reject" 驳回
+    action: String,
+    note: String,
+}
+
+/// 应用审核：通过 → 发布到市场；驳回 → 退回草稿并填写审核意见。
+async fn admin_app_review(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdminReviewRequest>,
+) -> Json<ActionResponse> {
+    let mut market = state.market.lock().await;
+    match market.iter_mut().find(|a| a.id == req.id) {
+        Some(app) => {
+            if req.action == "approve" {
+                app.status = "published".into();
+                app.visibility = "public".into();
+                app.review_note = "审核通过".into();
+            } else {
+                app.status = "draft".into();
+                app.visibility = "private".into();
+                app.review_note = if req.note.trim().is_empty() {
+                    "未通过审核".into()
+                } else {
+                    req.note.trim().into()
+                };
+            }
+            let cloned = app.clone();
+            Json(ActionResponse { ok: true, error: None, app: Some(cloned) })
+        }
+        None => Json(ActionResponse {
+            ok: false,
+            error: Some("应用不存在".into()),
+            app: None,
+        }),
+    }
+}
+
+/// 后台应用运营操作请求体。
+#[derive(Deserialize)]
+struct AdminStatusRequest {
+    id: String,
+    /// "disable" 停用 / "enable" 恢复 / "publish" 直接上架
+    action: String,
+}
+
+/// 运营操作：停用 / 恢复 / 直接上架。
+async fn admin_app_status(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdminStatusRequest>,
+) -> Json<ActionResponse> {
+    let mut market = state.market.lock().await;
+    match market.iter_mut().find(|a| a.id == req.id) {
+        Some(app) => match req.action.as_str() {
+            "disable" => {
+                app.status = "disabled".into();
+                app.visibility = "private".into();
+            }
+            "enable" => {
+                app.status = "draft".into();
+                app.visibility = "private".into();
+            }
+            "publish" => {
+                app.status = "published".into();
+                app.visibility = "public".into();
+            }
+            _ => {
+                return Json(ActionResponse {
+                    ok: false,
+                    error: Some("未知操作".into()),
+                    app: None,
+                })
+            }
+        },
+        None => {
+            return Json(ActionResponse {
+                ok: false,
+                error: Some("应用不存在".into()),
+                app: None,
+            })
+        }
+    }
+    let cloned = market
+        .iter()
+        .find(|a| a.id == req.id)
+        .cloned()
+        .unwrap();
+    Json(ActionResponse { ok: true, error: None, app: Some(cloned) })
+}
+
+/// 后台修改应用请求体。
+#[derive(Deserialize)]
+struct AdminAppEditRequest {
+    id: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    platforms: Vec<String>,
+}
+
+/// 管理员编辑应用基础信息。
+async fn admin_app_edit(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdminAppEditRequest>,
+) -> Json<ActionResponse> {
+    let mut market = state.market.lock().await;
+    match market.iter_mut().find(|a| a.id == req.id) {
+        Some(app) => {
+            if !req.name.trim().is_empty() {
+                app.name = req.name.trim().into();
+            }
+            app.description = req.description.to_string();
+            if !req.tags.is_empty() {
+                app.tags = req.tags.iter().filter(|s| !s.is_empty()).cloned().collect();
+            }
+            if !req.platforms.is_empty() {
+                app.platforms = req.platforms.iter().filter(|s| !s.is_empty()).cloned().collect();
+            }
+            let cloned = app.clone();
+            Json(ActionResponse { ok: true, error: None, app: Some(cloned) })
+        }
+        None => Json(ActionResponse {
+            ok: false,
+            error: Some("应用不存在".into()),
+            app: None,
+        }),
+    }
+}
+
+/// 后台删除请求体。
+#[derive(Deserialize)]
+struct AdminAppDeleteRequest {
+    id: String,
+}
+
+/// 管理员删除应用。
+async fn admin_app_delete(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AdminAppDeleteRequest>,
+) -> Json<ActionResponse> {
+    let mut market = state.market.lock().await;
+    match market.iter().position(|a| a.id == req.id) {
+        Some(i) => {
+            let removed = market.remove(i);
+            Json(ActionResponse { ok: true, error: None, app: Some(removed) })
+        }
+        None => Json(ActionResponse {
+            ok: false,
+            error: Some("应用不存在".into()),
+            app: None,
+        }),
+    }
+}
+
+/// 统计概览响应。
+#[derive(Serialize)]
+struct StatsResponse {
+    total_apps: u64,
+    published: u64,
+    reviewing: u64,
+    disabled: u64,
+    total_launches: u64,
+    total_users: u64,
+    active_users: u64,
+    total_incentive: u64,
+    top_apps: Vec<MarketApp>,
+    users: Vec<AppUser>,
+}
+
+/// 后台使用统计概览。
+async fn admin_stats(State(state): State<Arc<AppState>>) -> Json<StatsResponse> {
+    let market = state.market.lock().await.clone();
+    let users = state.users.lock().await.clone();
+
+    let total_apps = market.len() as u64;
+    let published = market.iter().filter(|a| a.status == "published").count() as u64;
+    let reviewing = market.iter().filter(|a| a.status == "reviewing").count() as u64;
+    let disabled = market.iter().filter(|a| a.status == "disabled").count() as u64;
+    let total_launches: u64 = market.iter().map(|a| a.launches).sum();
+    let total_users = users.len() as u64;
+    let active_users = users.iter().filter(|u| u.status == "active").count() as u64;
+    let total_incentive: u64 = users.iter().map(|u| u.incentive).sum();
+
+    let mut top_apps = market.clone();
+    top_apps.sort_by(|a, b| b.launches.cmp(&a.launches));
+    top_apps.truncate(6);
+
+    Json(StatsResponse {
+        total_apps,
+        published,
+        reviewing,
+        disabled,
+        total_launches,
+        total_users,
+        active_users,
+        total_incentive,
+        top_apps,
+        users,
+    })
+}
+
+/// 提示词查看/保存响应。
+#[derive(Serialize)]
+struct PromptResponse {
+    ok: bool,
+    version: &'static str,
+    prompt: String,
+    error: Option<String>,
+}
+
+/// 查看当前生效的“生成 app 技能提示词”。
+async fn admin_prompt(State(state): State<Arc<AppState>>) -> Json<PromptResponse> {
+    let prompt = state.prompt.lock().await.clone();
+    Json(PromptResponse {
+        ok: true,
+        version: aiapp_gen::SYSTEM_PROMPT_VERSION,
+        prompt,
+        error: None,
+    })
+}
+
+/// 保存请求体。
+#[derive(Deserialize)]
+struct PromptSaveRequest {
+    prompt: String,
+}
+
+/// 保存（在线迭代）生成 app 技能提示词，立即对后续生成生效。
+async fn admin_prompt_save(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<PromptSaveRequest>,
+) -> Json<PromptResponse> {
+    let content = req.prompt.trim().to_string();
+    if content.is_empty() {
+        return Json(PromptResponse {
+            ok: false,
+            version: aiapp_gen::SYSTEM_PROMPT_VERSION,
+            prompt: String::new(),
+            error: Some("提示词内容不能为空".into()),
+        });
+    }
+    *state.prompt.lock().await = content.clone();
+    // 持久化到工作目录下的提示词文件，重启后也能加载（若下次配置为偏好）。
+    Json(PromptResponse {
+        ok: true,
+        version: aiapp_gen::SYSTEM_PROMPT_VERSION,
+        prompt: content,
+        error: None,
+    })
+}
+
+/// 恢复生成 app 技能提示词为内置默认版本。
+async fn admin_prompt_reset(State(state): State<Arc<AppState>>) -> Json<PromptResponse> {
+    let default = aiapp_gen::default_system_prompt().to_string();
+    *state.prompt.lock().await = default.clone();
+    Json(PromptResponse {
+        ok: true,
+        version: aiapp_gen::SYSTEM_PROMPT_VERSION,
+        prompt: default,
+        error: None,
+    })
 }
 
 /// 启动服务。

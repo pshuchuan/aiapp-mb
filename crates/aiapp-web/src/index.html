@@ -319,6 +319,69 @@
   .modal .m-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .modal .m-btn.primary:hover { background: var(--accent-2); }
 
+  /* ===== 后台管理 ===== */
+  .admin-layout { display: flex; gap: 20px; align-items: flex-start; }
+  .admin-menu {
+    width: 210px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 8px; position: sticky; top: 70px;
+    flex-shrink: 0;
+  }
+  .admin-menu-item {
+    display: block; width: 100%; text-align: left; background: transparent;
+    border: none; border-radius: 8px; padding: 10px 14px; font-size: 13px;
+    color: var(--muted); cursor: pointer; transition: all .15s;
+  }
+  .admin-menu-item:hover { color: var(--text); background: var(--panel-2); }
+  .admin-menu-item.on { background: var(--accent); color: #fff; }
+  .admin-panel { flex: 1; min-width: 0; }
+  .admin-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px; margin-bottom: 16px;
+  }
+  .admin-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .admin-card .sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .stat-card {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; text-align: center;
+  }
+  .stat-card .num { font-size: 26px; font-weight: 800; color: var(--accent-2); }
+  .stat-card .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .admin-table th, .admin-table td {
+    text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .admin-table th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  .admin-table tr:hover td { background: var(--panel-2); }
+  .a-badge {
+    display: inline-block; font-size: 11px; border-radius: 4px;
+    padding: 2px 8px; background: var(--panel-2); color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .a-badge.published { background: #123a2f; color: #4ade80; border-color: #1f8a6a; }
+  .a-badge.reviewing { background: #3a3412; color: #ffd166; border-color: #8a6a1f; }
+  .a-badge.draft { background: #2a2d38; color: #b9bfc9; border-color: var(--border); }
+  .a-badge.disabled { background: #3a1220; color: #ff8a8a; border-color: #8a1f35; }
+  .a-badge.active { background: #123a2f; color: #4ade80; border-color: #1f8a6a; }
+  .a-badge.admin { background: #1e2a3a; color: #6ea8ff; border-color: #2c3d55; }
+  .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .small-btn {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 10px; font-size: 12px; color: var(--text); cursor: pointer; transition: all .15s;
+  }
+  .small-btn:hover { border-color: var(--accent); }
+  .small-btn.ok { border-color: #1f8a6a; color: #4ade80; }
+  .small-btn.warn { border-color: #8a6a1f; color: #ffd166; }
+  .small-btn.danger { border-color: #8a1f35; color: #ff8a8a; }
+  .small-btn.danger:hover { background: #3a1220; }
+  .a-note { font-size: 11px; color: var(--muted); }
+  .prompt-box { width: 100%; min-height: 320px; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+    font-family: "SF Mono", Consolas, monospace; font-size: 13px; line-height: 1.6; outline: none; }
+  .prompt-box:focus { border-color: var(--accent); }
+  .prompt-meta { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+
   .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; line-height: 1.8; }
 </style>
 </head>
@@ -331,6 +394,7 @@
     <div class="nav-tabs" id="navTabs">
       <span class="nav-tab on" data-view="market">🛍 应用市场</span>
       <span class="nav-tab" data-view="myapps">👤 我的应用</span>
+      <span class="nav-tab" data-view="admin">🛠 管理后台</span>
     </div>
   </div>
   <div class="topbar-right">
@@ -369,6 +433,27 @@
   <div id="viewMyApps" hidden>
     <div class="sec-title">👤 我的应用 <span class="sub">我拥有的应用，可先自己使用；发布到市场需填写基础信息</span></div>
     <div class="app-grid" id="myGrid"></div>
+  </div>
+  <!-- 管理后台视图 -->
+  <div id="viewAdmin" hidden>
+    <div class="admin-layout">
+      <div class="admin-menu" id="adminMenu">
+        <button class="admin-menu-item on" data-panel="stats">📊 使用统计</button>
+        <button class="admin-menu-item" data-panel="apps">📦 应用管理</button>
+        <button class="admin-menu-item" data-panel="users">👥 用户管理</button>
+        <button class="admin-menu-item" data-panel="prompt">🤖 生成提示词</button>
+      </div>
+      <div class="admin-panel">
+        <!-- 统计 -->
+        <div id="panelStats"></div>
+        <!-- 应用管理 -->
+        <div id="panelApps" hidden></div>
+        <!-- 用户管理 -->
+        <div id="panelUsers" hidden></div>
+        <!-- 提示词迭代 -->
+        <div id="panelPrompt" hidden></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -441,6 +526,10 @@ let currentAppId = null;
 let backgroundApps = [];
 let genMode = 'new';       // 'new' | 'update'
 let pendingApp = null;     // 最近一次生成的应用
+let currentAdminPanel = 'stats'; // 后台当前子面板
+let adminUsers = [];
+let adminApps = [];
+let adminStats = null;
 
 const $ = id => document.getElementById(id);
 
@@ -473,9 +562,11 @@ function setView(view) {
   currentView = view;
   $('viewMarket').hidden = view !== 'market';
   $('viewMyApps').hidden = view !== 'myapps';
+  $('viewAdmin').hidden = view !== 'admin';
   document.querySelectorAll('.nav-tab').forEach(t =>
     t.classList.toggle('on', t.dataset.view === view));
   if (view === 'myapps') { loadMyApps(); renderMyApps(); }
+  if (view === 'admin') { loadAdminPanel(currentAdminPanel); }
 }
 
 // ====== 生成器 ======
@@ -899,10 +990,24 @@ function customGenerate() {
   $('descInput').focus();
 }
 
-function reportApp() {
+async function reportApp() {
   const app = _appData && _appData.app;
   if (!app) return;
-  alert(`已收到你对「${app.name}」的举报，平台管理员会尽快核查处理。`);
+  const reason = prompt('请简要说明举报「' + app.name + '」的原因：', '');
+  if (reason === null) return;
+  try {
+    const res = await fetch('/api/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: app.id, reason })
+    });
+    const data = await res.json();
+    if (!data.ok) { alert(data.error || '举报失败'); return; }
+    alert('已收到你对「' + app.name + '」的举报，管理员会在后台核查处理。');
+    loadMarket();
+  } catch (e) {
+    alert('举报失败：' + e.message);
+  }
 }
 
 function closeAllWindows() {
@@ -935,11 +1040,319 @@ function esc(s) {
   return d.innerHTML;
 }
 
+// ====== 后台管理系统 ======
+const STATUS_LABEL = {
+  published: '已发布', reviewing: '审核中', draft: '草稿', disabled: '已停用'
+};
+
+function admStatusBadge(status) {
+  return `<span class="a-badge ${status}">${STATUS_LABEL[status] || status}</span>`;
+}
+
+function setAdminPanel(panel) {
+  currentAdminPanel = panel;
+  document.querySelectorAll('.admin-menu-item').forEach(b =>
+    b.classList.toggle('on', b.dataset.panel === panel));
+  ['stats', 'apps', 'users', 'prompt'].forEach(p =>
+    $('panel' + (p === 'stats' ? 'Stats' : p[0].toUpperCase() + p.slice(1))).hidden = p !== panel);
+  loadAdminPanel(panel);
+}
+
+function loadAdminPanel(panel) {
+  if (panel === 'stats') loadAdminStats();
+  else if (panel === 'apps') loadAdminApps();
+  else if (panel === 'users') loadAdminUsers();
+  else if (panel === 'prompt') loadAdminPrompt();
+}
+
+// --- 使用统计 ---
+async function loadAdminStats() {
+  const res = await fetch('/api/admin/stats');
+  const d = await res.json();
+  adminStats = d;
+  renderAdminStats(d);
+}
+
+function renderAdminStats(d) {
+  const el = $('panelStats');
+  const userRows = (d.users || []).map(u => `
+    <tr>
+      <td>${esc(u.name)}</td>
+      <td>${u.role === 'admin' ? '<span class="a-badge admin">管理员</span>' : '用户'}</td>
+      <td>${u.status === 'active' ? '<span class="a-badge active">正常</span>' : '<span class="a-badge disabled">停用</span>'}</td>
+      <td>${u.apps_generated}</td>
+      <td>${u.launches}</td>
+      <td>${u.incentive}</td>
+    </tr>`).join('');
+  const topApps = (d.top_apps || []).map((a, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${esc(a.name)}</td>
+      <td>${esc(appOwnerName(a.owner))}</td>
+      <td>${admStatusBadge(a.status)}</td>
+      <td>${a.launches}</td>
+    </tr>`).join('');
+  el.innerHTML = `
+    <div class="admin-card">
+      <h3>📊 平台概览</h3>
+      <div class="sub">应用使用情况总览，为后续用户激励、广告分成等运营提供数据依据</div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="num">${d.total_apps}</div><div class="lbl">应用总数</div></div>
+        <div class="stat-card"><div class="num">${d.published}</div><div class="lbl">已上架</div></div>
+        <div class="stat-card"><div class="num">${d.reviewing}</div><div class="lbl">审核中</div></div>
+        <div class="stat-card"><div class="num">${d.disabled}</div><div class="lbl">已停用</div></div>
+        <div class="stat-card"><div class="num">${d.total_launches}</div><div class="lbl">累计启动</div></div>
+        <div class="stat-card"><div class="num">${d.total_users}</div><div class="lbl">注册用户</div></div>
+        <div class="stat-card"><div class="num">${d.active_users}</div><div class="lbl">活跃用户</div></div>
+        <div class="stat-card"><div class="num">${d.total_incentive}</div><div class="lbl">已发放激励</div></div>
+      </div>
+    </div>
+    <div class="admin-card">
+      <h3>🏆 热门应用 TOP</h3>
+      <div class="sub">按启动次数排序</div>
+      <table class="admin-table">
+        <thead><tr><th>#</th><th>应用</th><th>所有者</th><th>状态</th><th>启动次数</th></tr></thead>
+        <tbody>${topApps || '<tr><td colspan="5">暂无数据</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="admin-card">
+      <h3>👥 用户贡献</h3>
+      <div class="sub">生成数与启动量（激励为后续激励计划的占位数据）</div>
+      <table class="admin-table">
+        <thead><tr><th>用户</th><th>角色</th><th>状态</th><th>生成应用</th><th>启动次数</th><th>激励</th></tr></thead>
+        <tbody>${userRows || '<tr><td colspan="6">暂无数据</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
+function appOwnerName(owner) {
+  if (owner === 'me') return '我';
+  const u = adminUsers.find(x => x.id === owner);
+  return u ? u.name : owner;
+}
+
+// --- 应用管理 ---
+async function loadAdminApps() {
+  const res = await fetch('/api/admin/apps');
+  const d = await res.json();
+  adminApps = d.apps || [];
+  renderAdminApps();
+}
+
+function renderAdminApps() {
+  const el = $('panelApps');
+  const rows = adminApps.map(a => {
+    const tags = (a.tags || []).map(t => `<span class="app-tag">${t}</span>`).join('');
+    const plat = (a.platforms || []).map(p => `<span class="plat-badge">${p}</span>`).join(' ');
+    let actions = '';
+    if (a.status === 'reviewing') {
+      actions = `<button class="small-btn ok" onclick="adminReview('${a.id}','approve')">✅ 通过</button>
+                 <button class="small-btn danger" onclick="adminReview('${a.id}','reject')">⛔ 驳回</button>`;
+    }
+    if (a.status === 'published') {
+      actions = `<button class="small-btn warn" onclick="adminStatus('${a.id}','disable')">🛑 停用</button>
+                 <button class="small-btn" onclick="adminEditApp('${a.id}')">✏️ 编辑</button>
+                 <button class="small-btn danger" onclick="adminDelete('${a.id}')">🗑 删除</button>`;
+    } else if (a.status === 'disabled') {
+      actions = `<button class="small-btn ok" onclick="adminStatus('${a.id}','enable')">▶ 恢复</button>`;
+    } else if (a.status === 'draft') {
+      actions = `<button class="small-btn ok" onclick="adminStatus('${a.id}','publish')">🚀 上架</button>`;
+    }
+    if (a.status !== 'published' && a.status !== 'disabled') {
+      actions += ` <button class="small-btn" onclick="adminEditApp('${a.id}')">✏️ 编辑</button>
+                   <button class="small-btn danger" onclick="adminDelete('${a.id}')">🗑 删除</button>`;
+    }
+    return `<tr>
+      <td><b>${esc(a.name)}</b><br><span class="a-note">${esc(appOwnerName(a.owner))}</span></td>
+      <td>${admStatusBadge(a.status)}<br><span class="a-note">v${a.version}</span></td>
+      <td>${tags || '<span class="a-note">—</span>'}</td>
+      <td>${plat || '<span class="a-note">—</span>'}</td>
+      <td>${a.launches}</td>
+      <td class="a-note">${a.report ? '🚩 ' + esc(a.report) : '—'}</td>
+      <td class="a-note">${esc(a.review_note) || '—'}</td>
+      <td><div class="admin-actions">${actions}</div></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="admin-card">
+      <h3>📦 应用管理</h3>
+      <div class="sub">审核、上架、停用、编辑与下架。新发布的应用进入“审核中”，通过后才对市场公开</div>
+      <div class="admin-actions" style="margin-bottom:12px">
+        <button class="small-btn ${currentAdminFilter==='all'?'':''}" onclick="setAdminAppFilter('all')">全部</button>
+        <button class="small-btn" onclick="setAdminAppFilter('reviewing')">仅审核中</button>
+        <button class="small-btn ok" onclick="setAdminAppFilter('published')">已上架</button>
+        <button class="small-btn warn" onclick="setAdminAppFilter('draft')">草稿</button>
+        <button class="small-btn danger" onclick="setAdminAppFilter('disabled')">已停用</button>
+      </div>
+      <table class="admin-table">
+        <thead><tr><th>应用</th><th>状态</th><th>标签</th><th>平台</th><th>启动</th><th>举报</th><th>审核意见</th><th>操作</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="8">暂无数据</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
+let currentAdminFilter = 'all';
+async function setAdminAppFilter(f) {
+  currentAdminFilter = f;
+  const res = await fetch('/api/admin/apps');
+  const d = await res.json();
+  adminApps = (d.apps || []);
+  if (f !== 'all') adminApps = adminApps.filter(a => a.status === f);
+  renderAdminApps();
+}
+
+async function adminReview(id, action) {
+  const note = action === 'reject'
+    ? (prompt('请填写驳回意见：', '') ?? '') : '';
+  const res = await fetch('/api/admin/app/review', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, action, note })
+  });
+  const d = await res.json();
+  if (!d.ok) { alert(d.error || '操作失败'); return; }
+  await loadAdminApps(); loadMarket();
+}
+
+async function adminStatus(id, action) {
+  const res = await fetch('/api/admin/app/status', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, action })
+  });
+  const d = await res.json();
+  if (!d.ok) { alert(d.error || '操作失败'); return; }
+  await loadAdminApps(); loadMarket();
+}
+
+async function adminEditApp(id) {
+  const a = adminApps.find(x => x.id === id);
+  if (!a) return;
+  const name = prompt('应用名称：', a.name);
+  if (name === null) return;
+  const desc = prompt('应用描述：', a.description);
+  if (desc === null) return;
+  const tags = prompt('标签（逗号分隔）：', (a.tags || []).join(','));
+  if (tags === null) return;
+  const platforms = prompt('支持平台（逗号分隔）：', (a.platforms || []).join(','));
+  if (platforms === null) return;
+  const res = await fetch('/api/admin/app/edit', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id, name,
+      description: desc,
+      tags: tags.split(/[,，]/).map(s => s.trim()).filter(Boolean),
+      platforms: platforms.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+    })
+  });
+  const d = await res.json();
+  if (!d.ok) { alert(d.error || '编辑失败'); return; }
+  await loadAdminApps(); loadMarket();
+}
+
+async function adminDelete(id) {
+  if (!confirm('确定删除该应用吗？此操作不可恢复。')) return;
+  const res = await fetch('/api/admin/app/delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id })
+  });
+  const d = await res.json();
+  if (!d.ok) { alert(d.error || '删除失败'); return; }
+  await loadAdminApps(); loadMarket();
+}
+
+// --- 用户管理 ---
+async function loadAdminUsers() {
+  const res = await fetch('/api/admin/users');
+  const d = await res.json();
+  adminUsers = d.users || [];
+  renderAdminUsers();
+}
+
+function renderAdminUsers() {
+  const el = $('panelUsers');
+  const rows = adminUsers.map(u => `
+    <tr>
+      <td><b>${esc(u.name)}</b><br><span class="a-note">${esc(u.id)}</span></td>
+      <td>${u.role === 'admin' ? '<span class="a-badge admin">管理员</span>' : '<span class="a-badge">用户</span>'}</td>
+      <td>${u.status === 'active' ? '<span class="a-badge active">正常</span>' : '<span class="a-badge disabled">停用</span>'}</td>
+      <td>${u.apps_generated}</td>
+      <td>${u.launches}</td>
+      <td>${u.incentive}</td>
+      <td>
+        ${u.role !== 'admin' ? (u.status === 'active'
+          ? '<button class="small-btn warn" onclick="adminToggleUser(\'' + u.id + '\',\'disable\')">🛑 停用</button>'
+          : '<button class="small-btn ok" onclick="adminToggleUser(\'' + u.id + '\',\'enable\')">▶ 启用</button>')
+          : '<span class="a-note">—</span>'}
+      </td>
+    </tr>`).join('');
+  el.innerHTML = `
+    <div class="admin-card">
+      <h3>👥 用户管理</h3>
+      <div class="sub">管理平台用户，可启用 / 停用账号（单用户原型，预置示例用户）</div>
+      <table class="admin-table">
+        <thead><tr><th>用户</th><th>角色</th><th>状态</th><th>生成应用</th><th>启动次数</th><th>激励</th><th>操作</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="7">暂无数据</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
+async function adminToggleUser(id, action) {
+  const res = await fetch('/api/admin/user/toggle', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, action })
+  });
+  const d = await res.json();
+  if (!d.ok) { alert(d.error || '操作失败'); return; }
+  loadAdminUsers();
+}
+
+// --- 提示词迭代 ---
+async function loadAdminPrompt() {
+  const res = await fetch('/api/admin/prompt');
+  const d = await res.json();
+  if (!d.ok) return;
+  const el = $('panelPrompt');
+  el.innerHTML = `
+    <div class="admin-card">
+      <h3>🤖 生成应用技能提示词</h3>
+      <div class="sub">文本独立维护、带版本号、结构化分区，可在线持续迭代；保存后对后续生成立即生效</div>
+      <div class="prompt-meta">
+        <span class="a-badge review">版本 ${esc(d.version)}</span>
+        <button class="small-btn" onclick="resetAdminPrompt()">↺ 恢复内置默认</button>
+      </div>
+      <textarea class="prompt-box" id="promptBox">${esc(d.prompt)}</textarea>
+      <div style="margin-top:12px;text-align:right">
+        <button class="m-btn primary" onclick="saveAdminPrompt()">💾 保存生效</button>
+      </div>
+    </div>`;
+}
+
+async function saveAdminPrompt() {
+  const content = $('promptBox').value;
+  const res = await fetch('/api/admin/prompt', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: content })
+  });
+  const d = await res.json();
+  if (!d.ok) { alert(d.error || '保存失败'); return; }
+  alert('已保存并生效，后续生成将使用最新提示词。');
+}
+
+async function resetAdminPrompt() {
+  if (!confirm('恢复为内置默认提示词？当前编辑内容将被覆盖。')) return;
+  const res = await fetch('/api/admin/prompt/reset', { method: 'POST' });
+  const d = await res.json();
+  if (!d.ok) { alert(d.error || '恢复失败'); return; }
+  $('promptBox').value = d.prompt;
+  alert('已恢复内置默认提示词，点“保存生效”使其生效。');
+}
+
 // ====== 初始化 ======
 (async function init() {
   currentPlatforms = detectPlatforms();
   document.querySelectorAll('.nav-tab').forEach(t =>
     t.onclick = () => setView(t.dataset.view));
+  document.querySelectorAll('.admin-menu-item').forEach(b =>
+    b.onclick = () => { setAdminPanel(b.dataset.panel); });
   const tres = await fetch('/api/templates');
   const tdata = await tres.json();
   templates = tdata.templates || [];

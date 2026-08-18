@@ -11,5 +11,8 @@ target/
 # 生成的示例应用
 /generated/
 
+# Web 运行时生成的工程（服务启动时写入）
+/generated_web/
+
 # 系统
 .DS_Store

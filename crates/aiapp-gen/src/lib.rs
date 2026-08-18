@@ -17,6 +17,9 @@ use std::path::{Path, PathBuf};
 
 pub use config::{Backend, GenConfig};
 pub use manifest::AppManifest;
+pub use openai::{
+    default_system_prompt, generate_with_prompt, SYSTEM_PROMPT_VERSION,
+};
 pub use templates::TEMPLATES;
 
 /// 生成器统一错误类型。
@@ -50,6 +53,31 @@ pub fn generate_source(desc: &str, config: &GenConfig, template: &str) -> Result
     match config.backend {
         Backend::Mock => mock::generate(desc),
         Backend::OpenAi => openai::generate(desc, config),
+    }
+}
+
+/// 使用可覆盖的系统提示词生成源码（支持后台管理端持续迭代提示词）。
+/// `override_prompt` 与 `generate_source` 语义一致，仅 OpenAi 后端会用到提示词。
+pub fn generate_source_with_prompt(
+    desc: &str,
+    config: &GenConfig,
+    template: &str,
+    override_prompt: &str,
+) -> Result<String, GenError> {
+    if config.backend == Backend::Mock && !template.is_empty() {
+        if let Some(source) = templates::get_template_source(template, desc) {
+            return Ok(source);
+        }
+        let available = TEMPLATES
+            .iter()
+            .map(|(n, _)| *n)
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(GenError::UnknownTemplate(template.into(), available));
+    }
+    match config.backend {
+        Backend::Mock => mock::generate(desc),
+        Backend::OpenAi => openai::generate_with_prompt(desc, config, override_prompt),
     }
 }
 
