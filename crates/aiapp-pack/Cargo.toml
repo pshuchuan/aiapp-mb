@@ -1,0 +1,18 @@
+[package]
+name = "aiapp-pack"
+description = "aiapp standalone app packer: turn a .aiapp into buildable Tauri (desktop) / Capacitor (mobile) projects in one step, with brand customization"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+aiapp-format = { path = "../aiapp-format" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# Brand icon generation (pure Rust PNG encoding; used only at pack time, not part of the runtime artifact)
+png = "0.17"
+
+[dev-dependencies]

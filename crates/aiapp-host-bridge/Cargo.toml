@@ -1,0 +1,25 @@
+[package]
+name = "aiapp-host-bridge"
+description = "aiapp mobile host bridge layer: C-ABI interface for iOS (Swift) / Android (Kotlin+JNI) host Apps to call the Rust runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "aiapp_host_bridge"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aiapp-format = { path = "../aiapp-format" }
+aiapp-engine = { path = "../aiapp-engine" }
+anyhow.workspace = true
+async-trait = "0.1"
+tokio.workspace = true
+
+# Enable when iOS/Android hosts need to actually execute WASM:
+# iOS: cargo build -p aiapp-host-bridge --features wasmtime
+# Android: cargo ndk -p aiapp-host-bridge --target aarch64-linux-android ... --features wasmtime
+[features]
+default = []
+wasmtime = ["aiapp-engine/wasmtime"]

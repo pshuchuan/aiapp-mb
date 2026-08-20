@@ -1,0 +1,18 @@
+[package]
+name = "aiapp-cli"
+description = "aiapp-mb command-line entry: description → MoonBit source → WASM bytecode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "aiapp"
+path = "src/main.rs"
+
+[dependencies]
+aiapp-build = { path = "../aiapp-build" }
+aiapp-gen = { path = "../aiapp-gen" }
+aiapp-pack = { path = "../aiapp-pack" }
+anyhow.workspace = true
+clap.workspace = true

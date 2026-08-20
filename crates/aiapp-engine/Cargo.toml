@@ -1,0 +1,35 @@
+[package]
+name = "aiapp-engine"
+description = "aiapp lightweight runtime: WIT host capability contract + permission gate + pluggable executor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+aiapp-format = { path = "../aiapp-format" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+async-trait = "0.1"
+tokio.workspace = true
+
+# Real WASM executor (Wasmtime + WASI). Off by default to keep compilation light;
+# enable it when you need to actually run WASM bytecode: cargo build --features wasmtime
+[features]
+default = []
+wasmtime = ["dep:wasmtime", "dep:wasmtime-wasi", "dep:wasi-common"]
+
+[dependencies.wasmtime]
+version = "24"
+optional = true
+default-features = false
+features = ["cranelift", "gc"]
+
+[dependencies.wasmtime-wasi]
+version = "24"
+optional = true
+
+[dependencies.wasi-common]
+version = "24"
+optional = true

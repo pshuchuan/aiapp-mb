@@ -1,0 +1,11 @@
+[package]
+name = "aiapp-build"
+description = "aiapp-mb builder: invokes the MoonBit toolchain to compile a project into WASM bytecode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+aiapp-format = { path = "../aiapp-format" }
+thiserror.workspace = true
