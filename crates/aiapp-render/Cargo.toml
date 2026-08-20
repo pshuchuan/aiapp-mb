@@ -1,0 +1,13 @@
+[package]
+name = "aiapp-render"
+description = "Rendering layer abstraction for the aiapp ecosystem — defines AppRenderer trait, HostApi, and renderer protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+aiapp-format = { path = "../aiapp-format" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
