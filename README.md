@@ -1,3 +1,7 @@
+<p align="right">
+  <a href="README.zh-CN.md">中文</a> | <strong>English</strong>
+</p>
+
 # aiapp-lib
 
 Core library workspace for the aiapp ecosystem — published to crates.io as individual crates.
